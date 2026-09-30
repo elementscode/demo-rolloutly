@@ -1,0 +1,197 @@
+import "./style.css";
+import { sql, ValidationError } from "@elements/app";
+import favicon from "#app/shared/assets/favicons/favicon.svg";
+import { Layout } from "#app/shared/templates/layout";
+import { CurrentUser, requireAdminOrThrow, Role } from "#app/shared/services/auth";
+import { timeAgo } from "#app/shared/format";
+
+export interface Member {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  deploys: number;
+  lastDeployAt: Date | null;
+}
+
+interface MemberForm {
+  name: string;
+  email: string;
+  password: string;
+  role: Role;
+  error: string;
+}
+
+export function loadTeam(): Member[] {
+  return sql<Member>(`
+    select u.id, u.name, u.email, u.role,
+           count(d.id)::int as deploys,
+           max(d.createdAt) as lastDeployAt
+      from users u
+      left join deploys d on d.userId = u.id
+     group by u.id
+     order by u.role desc, u.name
+  `).all();
+}
+
+/** @rpc */
+export function setRole(userId: string, role: Role): Member[] {
+  let admin = requireAdminOrThrow();
+
+  if (userId === admin.id) {
+    throw new ValidationError("you cannot change your own role");
+  }
+
+  if (role !== "admin" && role !== "engineer") {
+    throw new ValidationError("pick a role");
+  }
+
+  sql(`update users set role = ${role} where id = ${userId}`);
+
+  return loadTeam();
+}
+
+/** @rpc */
+export function addMember(form: MemberForm): Member[] {
+  requireAdminOrThrow();
+
+  let email = form.email.trim().toLowerCase();
+  let name = form.name.trim();
+
+  if (!name) {
+    throw new ValidationError("enter a name");
+  }
+
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    throw new ValidationError("enter a valid email address");
+  }
+
+  if (form.password.length < 8) {
+    throw new ValidationError("the password needs at least 8 characters");
+  }
+
+  if (!sql(`select 1 from users where email = ${email}`).empty()) {
+    throw new ValidationError("that email already has an account");
+  }
+
+  sql(`
+    insert into users (name, email, role, passwordHash)
+         values (${name}, ${email}, ${form.role}, crypt(${form.password}, genSalt('bf', 12)))
+  `);
+
+  return loadTeam();
+}
+
+function onRole(members: { list: Member[]; error: string }, member: Member, role: Role) {
+  try {
+    members.list = setRole(member.id, role);
+    members.error = "";
+  } catch (err: any) {
+    members.error = err.message;
+  }
+}
+
+function onAdd(members: { list: Member[]; error: string }, form: MemberForm) {
+  try {
+    members.list = addMember(form);
+    form.name = "";
+    form.email = "";
+    form.password = "";
+    form.role = "engineer";
+    form.error = "";
+  } catch (err: any) {
+    form.error = err.message;
+  }
+}
+
+<html lang="en" class="page-team" (
+  user: CurrentUser,
+  initial: Member[],
+  private members: { list: Member[]; error: string } = { list: initial, error: "" },
+  private form: MemberForm = { name: "", email: "", password: "", role: "engineer" as Role, error: "" },
+  private now: Date = new Date(),
+)>
+  <head>
+    <title>Team · rolloutly</title>
+    <meta name="description" content="Accounts and roles">
+    <link rel="icon" type="image/svg+xml" href={favicon} />
+  </head>
+  <body>
+    <Layout {user} active="team">
+      <div class="team stack is-xl">
+        <div class="stack is-xs">
+          <h1>Team</h1>
+          <p class="text-sm">Engineers deploy and roll back. Admins also manage accounts here.</p>
+        </div>
+
+        <section class="card">
+          <div class="card-body">
+            <p e:if={members.error} class="callout is-danger" role="alert">{members.error}</p>
+            <table class="team-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th class="team-wide">Deploys</th>
+                  <th class="team-wide">Last deploy</th>
+                  <th>Role</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr e:for={m of members.list}>
+                  <td>
+                    <div>{m.name}</div>
+                    <div class="team-sub">{m.email}</div>
+                  </td>
+                  <td class="team-wide">{m.deploys}</td>
+                  <td class="team-wide">{timeAgo(m.lastDeployAt, now)}</td>
+                  <td>
+                    <span e:if={m.id === user.id} class="pill is-accent">{m.role} (you)</span>
+                    <select e:else
+                            class="is-sm"
+                            aria-label={`Role for ${m.name}`}
+                            value={m.role}
+                            onchange={(e) => onRole(members, m, (e.target as HTMLSelectElement).value as Role)}>
+                      <option value="engineer">engineer</option>
+                      <option value="admin">admin</option>
+                    </select>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2 class="text-md">Add an account</h2>
+          </div>
+          <form class="card-body team-form" onsubmit={() => onAdd(members, form)}>
+            <div class="field">
+              <label for="name">Name</label>
+              <input id="name" value={form.name} autocomplete="off" required>
+            </div>
+            <div class="field">
+              <label for="email">Email</label>
+              <input id="email" type="email" value={form.email} autocomplete="off" autocapitalize="none" spellcheck={false} required>
+            </div>
+            <div class="field">
+              <label for="password">Password</label>
+              <input id="password" type="password" value={form.password} autocomplete="new-password" minlength={8} required>
+            </div>
+            <div class="field">
+              <label for="role">Role</label>
+              <select id="role" value={form.role}>
+                <option value="engineer">engineer</option>
+                <option value="admin">admin</option>
+              </select>
+            </div>
+            <p e:if={form.error} class="callout is-danger team-form-actions" role="alert">{form.error}</p>
+            <div class="team-form-actions row">
+              <button type="submit" class="is-primary">Add account</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </Layout>
+  </body>
+</html>

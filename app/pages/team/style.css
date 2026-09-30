@@ -1,0 +1,39 @@
+@import "#app/shared/styles/page.css";
+
+.team {
+  max-width: 52rem;
+}
+
+.team-table td {
+  vertical-align: middle;
+}
+
+.team-table select {
+  width: auto;
+}
+
+.team-sub {
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+
+.team-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.team-form-actions {
+  grid-column: 1 / -1;
+  justify-content: end;
+}
+
+@media (max-width: 40rem) {
+  .team-wide {
+    display: none;
+  }
+
+  .team-form {
+    grid-template-columns: 1fr;
+  }
+}

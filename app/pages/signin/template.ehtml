@@ -1,0 +1,104 @@
+import "./style.css";
+import { redirect } from "@elements/app";
+import { DemoLogin, signin } from "#app/shared/services/auth";
+
+interface SigninForm {
+  email: string;
+  password: string;
+  error: string;
+  busy: boolean;
+}
+
+function onSubmit(form: SigninForm) {
+  form.busy = true;
+
+  try {
+    signin(form.email, form.password);
+    form.error = "";
+    redirect("/");
+  } catch (err: any) {
+    form.error = err.message;
+    form.busy = false;
+  }
+}
+
+function onPick(form: SigninForm, login: DemoLogin) {
+  form.email = login.email;
+  form.password = login.password;
+  onSubmit(form);
+}
+
+<html lang="en" class="page-signin" (
+  logins: DemoLogin[],
+  private form: SigninForm = { email: "", password: "", error: "", busy: false },
+)>
+  <head>
+    <title>Sign in · rolloutly</title>
+    <meta name="description" content="Sign in to rolloutly">
+  </head>
+  <body>
+    <main class="signin-main">
+      <div class="signin-panel">
+        <form class="signin-form stack is-lg" onsubmit={() => onSubmit(form)}>
+          <div class="signin-brand row">
+            <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <rect width="24" height="24" rx="6" fill="currentColor"/>
+              <path d="M6 15.5 L10.5 11 L13.5 14 L18 8.5" stroke="var(--accent-ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            </svg>
+            rolloutly
+          </div>
+
+          <div class="stack is-xs">
+            <h1>Sign in</h1>
+            <p class="text-sm">Deploys, rollbacks and health for every service.</p>
+          </div>
+
+          <p e:if={form.error} class="callout is-danger" role="alert">{form.error}</p>
+
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email"
+                   name="email"
+                   type="email"
+                   value={form.email}
+                   autocomplete="email"
+                   autocapitalize="none"
+                   spellcheck={false}
+                   placeholder="you@rolloutly.dev"
+                   required>
+          </div>
+
+          <div class="field">
+            <label for="password">Password</label>
+            <input id="password"
+                   name="password"
+                   type="password"
+                   value={form.password}
+                   autocomplete="current-password"
+                   required>
+          </div>
+
+          <button type="submit" class={["is-primary", form.busy && "is-loading"]}>Sign in</button>
+        </form>
+
+        <section class="card">
+          <div class="card-head">
+            <h2 class="text-md">Demo accounts</h2>
+          </div>
+          <div class="signin-logins stack">
+            <button e:for={login of logins}
+                    type="button"
+                    class="signin-login"
+                    onclick={() => onPick(form, login)}>
+              <span class="signin-login-top">
+                <span class="signin-login-name">{login.name}</span>
+                <span class={["pill", login.role === "admin" && "is-accent"]}>{login.role}</span>
+              </span>
+              <span class="signin-login-cred">{login.email} / {login.password}</span>
+            </button>
+          </div>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

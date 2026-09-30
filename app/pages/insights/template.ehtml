@@ -1,0 +1,231 @@
+import "./style.css";
+import type { Listener } from "@elements/app";
+import favicon from "#app/shared/assets/favicons/favicon.svg";
+import { Layout } from "#app/shared/templates/layout";
+import { ColumnChart, DotChart, LineChart } from "#app/shared/templates/charts";
+import { CurrentUser } from "#app/shared/services/auth";
+import { fetchInsights } from "#app/shared/services/deploys";
+import { DayValue, DeployEvent, Insights, Service } from "#app/shared/services/models";
+import { dateTime, duration } from "#app/shared/format";
+import { lastValue, shortDay } from "#app/shared/charts";
+
+interface InsightsState {
+  data: Insights;
+  serviceId: string;
+  busy: boolean;
+  dirty: boolean;
+}
+
+function onRefresh(state: InsightsState) {
+  if (state.busy) {
+    state.dirty = true;
+    return;
+  }
+
+  state.busy = true;
+
+  try {
+    do {
+      state.dirty = false;
+      state.data = fetchInsights(state.serviceId);
+    } while (state.dirty);
+  } finally {
+    state.busy = false;
+  }
+}
+
+function onStart(state: InsightsState, events: Listener<DeployEvent>) {
+  events.on("notify", () => onRefresh(state));
+}
+
+function successRate(data: Insights): string {
+  return data.totals.deploys === 0 ? "–" : `${((100 * data.totals.succeeded) / data.totals.deploys).toFixed(1)}%`;
+}
+
+function mttr(data: Insights): string {
+  return data.totals.mttrMinutes === null ? "–" : duration(data.totals.mttrMinutes * 60);
+}
+
+function openIncidents(data: Insights): number {
+  return data.recoveries.filter((r) => r.minutes === null).length;
+}
+
+function latest(points: DayValue[], unit: "seconds" | "percent"): string {
+  let last = lastValue(points.map((p) => p.value));
+  if (!last) {
+    return "–";
+  }
+
+  return unit === "percent" ? `${Math.round(last.v)}%` : duration(last.v);
+}
+
+function scopeName(services: Service[], serviceId: string): string {
+  return services.find((s) => s.id === serviceId)?.name ?? "All services";
+}
+
+<html lang="en" class="page-insights" (
+  user: CurrentUser,
+  services: Service[],
+  initial: Insights,
+  events: Listener<DeployEvent>,
+  private state: InsightsState = { data: initial, serviceId: initial.serviceId, busy: false, dirty: false },
+) oninit={() => onStart(state, events)}>
+  <head>
+    <title>Insights · rolloutly</title>
+    <meta name="description" content="Deploy frequency, build time, success rate and time to recovery">
+    <link rel="icon" type="image/svg+xml" href={favicon} />
+  </head>
+  <body>
+    <Layout {user} active="insights">
+      <div class="stack is-xl">
+        <div class="insights-head row">
+          <div class="stack is-xs">
+            <h1>Insights</h1>
+            <p class="text-sm">{scopeName(services, state.serviceId)}, last 30 days. Updates as deploys finish.</p>
+          </div>
+          <select aria-label="Service" value={state.serviceId} onchange={() => onRefresh(state)}>
+            <option value="">All services</option>
+            <option e:for={s of services} value={s.id}>{s.name}</option>
+          </select>
+        </div>
+
+        <div class="insights-kpis">
+          <div class="card kpi">
+            <div class="kpi-label">Deploys</div>
+            <div class="kpi-value">{state.data.totals.deploys.toLocaleString()}</div>
+            <div class="kpi-sub">{state.data.totals.failed} failed</div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-label">Success rate</div>
+            <div class="kpi-value">{successRate(state.data)}</div>
+            <div class="kpi-sub">{state.data.totals.succeeded.toLocaleString()} succeeded</div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-label">Median build</div>
+            <div class="kpi-value">{duration(state.data.totals.medianBuildSeconds)}</div>
+            <div class="kpi-sub">build stage only</div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-label">Mean time to recovery</div>
+            <div class="kpi-value">{mttr(state.data)}</div>
+            <div class="kpi-sub">
+              {state.data.totals.incidents} failed production deploys{openIncidents(state.data) > 0 ? `, ${openIncidents(state.data)} open` : ""}
+            </div>
+          </div>
+        </div>
+
+        <div class="insights-charts">
+          <section class="card chart-card">
+            <div class="card-head">
+              <div>
+                <h2>Deploys per day</h2>
+                <div class="chart-card-sub">Staging and production, deploys and rollbacks</div>
+              </div>
+              <div class="chart-legend">
+                <span><span class="chart-key"></span>succeeded</span>
+                <span><span class="chart-key is-fail"></span>failed</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <ColumnChart data={state.data.deploysPerDay} />
+            </div>
+          </section>
+
+          <section class="card chart-card">
+            <div class="card-head">
+              <div>
+                <h2>Build duration</h2>
+                <div class="chart-card-sub">Average successful build stage per day</div>
+              </div>
+              <div class="chart-latest">{latest(state.data.buildSeconds, "seconds")}<span>latest day</span></div>
+            </div>
+            <div class="card-body">
+              <LineChart points={state.data.buildSeconds} unit="seconds" label="average build" />
+            </div>
+          </section>
+
+          <section class="card chart-card">
+            <div class="card-head">
+              <div>
+                <h2>Success rate</h2>
+                <div class="chart-card-sub">Share of finished deploys that succeeded, per day</div>
+              </div>
+              <div class="chart-latest">{latest(state.data.successRate, "percent")}<span>latest day</span></div>
+            </div>
+            <div class="card-body">
+              <LineChart points={state.data.successRate} unit="percent" label="success rate" />
+            </div>
+          </section>
+
+          <section class="card chart-card">
+            <div class="card-head">
+              <div>
+                <h2>Time to recovery</h2>
+                <div class="chart-card-sub">Each failed production deploy, until production next deployed cleanly</div>
+              </div>
+              <div class="chart-legend">
+                <span><span class="chart-key is-dot"></span>recovered</span>
+                <span><span class="chart-key is-open"></span>not yet</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <DotChart recoveries={state.data.recoveries}
+                        mean={state.data.totals.mttrMinutes}
+                        days={state.data.deploysPerDay.map((d) => d.day)} />
+            </div>
+          </section>
+        </div>
+
+        <details class="insights-data card">
+          <summary class="card-head">Daily numbers as a table</summary>
+          <div class="card-body table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th>Succeeded</th>
+                  <th>Failed</th>
+                  <th>Success rate</th>
+                  <th>Average build</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr e:for={d of state.data.deploysPerDay.map((d, i) => ({ ...d, id: `r${i}`, build: state.data.buildSeconds[i]?.value ?? null, rate: state.data.successRate[i]?.value ?? null })).reverse()}>
+                  <td>{shortDay(d.day)}</td>
+                  <td>{d.succeeded}</td>
+                  <td>{d.failed}</td>
+                  <td>{d.rate === null ? "–" : `${d.rate.toFixed(0)}%`}</td>
+                  <td>{duration(d.build)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+
+        <details class="insights-data card">
+          <summary class="card-head">Failed production deploys as a table</summary>
+          <div class="card-body table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Deploy</th>
+                  <th>Service</th>
+                  <th>Failed</th>
+                  <th>Recovered in</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr e:for={r of state.data.recoveries.map((r) => ({ ...r, id: r.deployId })).reverse()}>
+                  <td><a href={`/deploys/${r.number}`}>#{r.number}</a></td>
+                  <td>{r.serviceName}</td>
+                  <td>{dateTime(r.failedAt)}</td>
+                  <td>{r.minutes === null ? "not yet" : duration(r.minutes * 60)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+    </Layout>
+  </body>
+</html>

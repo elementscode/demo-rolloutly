@@ -1,0 +1,23 @@
+.health-badge {
+  white-space: nowrap;
+}
+
+.health-badge.is-success .pill-dot {
+  animation: health-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes health-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--success) 45%, transparent);
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--success) 0%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .health-badge.is-success .pill-dot {
+    animation: none;
+  }
+}

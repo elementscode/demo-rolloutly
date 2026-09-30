@@ -1,0 +1,84 @@
+@import "#app/shared/styles/page.css";
+
+.signin-main {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-10) var(--space-5);
+}
+
+.signin-panel {
+  width: 100%;
+  max-width: 56rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-8);
+  align-items: start;
+}
+
+.signin-brand {
+  gap: var(--space-2);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-lg);
+}
+
+.signin-brand svg {
+  color: var(--accent);
+}
+
+.signin-form h1 {
+  margin: 0;
+}
+
+.signin-logins {
+  gap: 0;
+}
+
+.signin-login {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+  height: auto;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--rule-soft);
+  border-radius: 0;
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: var(--weight-regular);
+}
+
+.signin-login:first-child {
+  border-top: 0;
+}
+
+.signin-login:hover {
+  background: var(--bg-soft);
+}
+
+.signin-login-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.signin-login-name {
+  font-weight: var(--weight-medium);
+}
+
+.signin-login-cred {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+
+@media (max-width: 48rem) {
+  .signin-panel {
+    grid-template-columns: 1fr;
+  }
+}

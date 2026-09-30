@@ -1,0 +1,130 @@
+import "./style.css";
+import { redirect } from "@elements/app";
+import favicon from "#app/shared/assets/favicons/favicon.svg";
+import { Layout } from "#app/shared/templates/layout";
+import { CurrentUser } from "#app/shared/services/auth";
+import { DeployTargets, startDeploy } from "#app/shared/services/deploys";
+import { Commit, Env, ENVIRONMENTS, EnvState } from "#app/shared/services/models";
+import { shortSha, timeAgo } from "#app/shared/format";
+
+interface DeployForm {
+  serviceId: string;
+  environment: Env;
+  commitId: string;
+  error: string;
+  busy: boolean;
+}
+
+function commitsFor(targets: DeployTargets, serviceId: string): Commit[] {
+  return targets.commits.filter((c) => c.serviceId === serviceId);
+}
+
+function envFor(targets: DeployTargets, serviceId: string, name: Env): EnvState | undefined {
+  return targets.environments.find((e) => e.serviceId === serviceId && e.name === name);
+}
+
+function runningIn(targets: DeployTargets, serviceId: string, commit: Commit): Env[] {
+  return ENVIRONMENTS.filter((name) => envFor(targets, serviceId, name)?.currentVersion === commit.version);
+}
+
+function onServiceChange(form: DeployForm, targets: DeployTargets) {
+  form.commitId = commitsFor(targets, form.serviceId)[0]?.id ?? "";
+  form.error = "";
+}
+
+function onSubmit(form: DeployForm) {
+  if (!form.commitId) {
+    form.error = "pick a commit";
+    return;
+  }
+
+  form.busy = true;
+
+  try {
+    let number = startDeploy({ serviceId: form.serviceId, environment: form.environment, commitId: form.commitId });
+    redirect(`/deploys/${number}`);
+  } catch (err: any) {
+    form.error = err.message;
+    form.busy = false;
+  }
+}
+
+<html lang="en" class="page-new-deploy" (
+  user: CurrentUser,
+  targets: DeployTargets,
+  serviceId: string,
+  environment: Env,
+  private form: DeployForm = {
+    serviceId,
+    environment,
+    commitId: commitsFor(targets, serviceId)[0]?.id ?? "",
+    error: "",
+    busy: false,
+  },
+)>
+  <head>
+    <title>New deploy · rolloutly</title>
+    <meta name="description" content="Pick a service, environment and commit to deploy">
+    <link rel="icon" type="image/svg+xml" href={favicon} />
+  </head>
+  <body>
+    <Layout {user} active="">
+      <form class="new-deploy stack is-xl" onsubmit={() => onSubmit(form)}>
+        <div class="stack is-xs">
+          <h1>New deploy</h1>
+          <p class="text-sm">Runs build, test, migrate, release and a health check.</p>
+        </div>
+
+        <div class="field">
+          <label for="service">Service</label>
+          <select id="service" value={form.serviceId} onchange={() => onServiceChange(form, targets)}>
+            <option e:for={s of targets.services} value={s.id}>{s.name}</option>
+          </select>
+        </div>
+
+        <fieldset class="stack is-sm">
+          <legend>Environment</legend>
+          <div class="new-deploy-envs">
+            <label e:for={name of ENVIRONMENTS} class="choice">
+              <input type="radio" name="environment" group={form.environment} value={name}>
+              <span class="choice-body">
+                <span class="choice-title">{name}</span>
+                <span class="choice-sub">
+                  running <span class="mono">{envFor(targets, form.serviceId, name)?.currentVersion ?? "nothing"}</span>
+                </span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="stack is-sm">
+          <legend>Commit</legend>
+          <div class="commit-list stack">
+            <label e:for={c of commitsFor(targets, form.serviceId)} class="choice">
+              <input type="radio" name="commit" group={form.commitId} value={c.id}>
+              <span class="choice-body">
+                <span class="commit-title">
+                  <span class="mono">{c.version}</span>
+                  <span class="commit-message">{c.message}</span>
+                  <span e:for={env of runningIn(targets, form.serviceId, c)} class="pill is-accent">in {env}</span>
+                </span>
+                <span class="choice-sub">
+                  <span class="mono">{shortSha(c.sha)}</span> · {c.author} · {timeAgo(c.committedAt, new Date())}
+                </span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+
+        <p e:if={form.error} class="callout is-danger" role="alert">{form.error}</p>
+
+        <div class="new-deploy-actions row">
+          <a href="/" class="button is-ghost">Cancel</a>
+          <button type="submit" class={["is-primary", form.busy && "is-loading"]}>
+            Deploy to {form.environment}
+          </button>
+        </div>
+      </form>
+    </Layout>
+  </body>
+</html>

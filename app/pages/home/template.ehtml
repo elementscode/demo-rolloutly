@@ -1,0 +1,188 @@
+import "./style.css";
+import type { Listener } from "@elements/app";
+import favicon from "#app/shared/assets/favicons/favicon.svg";
+import { Layout } from "#app/shared/templates/layout";
+import { DeployItem } from "#app/shared/templates/deploy-item";
+import { HealthBadge } from "#app/shared/templates/health-badge";
+import { CurrentUser } from "#app/shared/services/auth";
+import { fetchOverview } from "#app/shared/services/deploys";
+import { applyHealth, DeployEvent, DeployRow, EnvState, HealthEvent, Overview, ServiceCard } from "#app/shared/services/models";
+import { duration, elapsed, shortSha, timeAgo } from "#app/shared/format";
+
+interface LiveState {
+  overview: Overview;
+  now: Date;
+  busy: boolean;
+  dirty: boolean;
+}
+
+interface Segment {
+  id: string;
+  state: string;
+}
+
+/**
+ * Stage changes arrive in bursts (one finishes, the next starts), so a
+ * refresh already in flight absorbs the ones behind it.
+ */
+function onDeployEvent(state: LiveState) {
+  if (state.busy) {
+    state.dirty = true;
+    return;
+  }
+
+  state.busy = true;
+
+  try {
+    do {
+      state.dirty = false;
+      state.overview = fetchOverview();
+    } while (state.dirty);
+  } finally {
+    state.busy = false;
+  }
+}
+
+function onHealth(state: LiveState, event: HealthEvent) {
+  let envs: EnvState[] = state.overview.services.flatMap((s) => [s.staging, s.production]);
+  applyHealth(envs, event.environments);
+}
+
+function onStart(state: LiveState, deploys: Listener<DeployEvent>, health: Listener<HealthEvent>) {
+  deploys.on("notify", () => onDeployEvent(state));
+  health.on("notify", (event) => onHealth(state, event));
+  setInterval(() => state.now = new Date(), 1000);
+}
+
+function segments(d: DeployRow): Segment[] {
+  let list: Segment[] = [];
+
+  for (let i = 0; i < d.stagesTotal; i++) {
+    let state = i < d.stagesDone ? "is-done" : i === d.stagesDone && d.status === "running" ? "is-now" : "";
+    list.push({ id: `${d.id}-${i}`, state });
+  }
+
+  return list;
+}
+
+function unhealthy(services: ServiceCard[]): number {
+  return services.filter((s) => s.staging.health !== "healthy" || s.production.health !== "healthy").length;
+}
+
+<html lang="en" class="page-home" (
+  user: CurrentUser,
+  initial: Overview,
+  deploys: Listener<DeployEvent>,
+  health: Listener<HealthEvent>,
+  private state: LiveState = { overview: initial, now: new Date(), busy: false, dirty: false },
+) oninit={() => onStart(state, deploys, health)}>
+  <head>
+    <title>Overview · rolloutly</title>
+    <meta name="description" content="Every service, its environments and their health">
+    <link rel="icon" type="image/svg+xml" href={favicon} />
+  </head>
+  <body>
+    <Layout {user} active="overview">
+      <div class="stack is-xl">
+        <div class="overview-head row">
+          <div class="stack is-xs">
+            <h1>Overview</h1>
+            <p class="text-sm">{state.overview.services.length} services across staging and production</p>
+          </div>
+        </div>
+
+        <div class="overview-stats">
+          <div class="card overview-stat">
+            <div class="overview-stat-label">Deploys today</div>
+            <div class="overview-stat-value">{state.overview.today.deploys}</div>
+          </div>
+          <div class="card overview-stat">
+            <div class="overview-stat-label">Failed today</div>
+            <div class="overview-stat-value">{state.overview.today.failed}</div>
+          </div>
+          <div class="card overview-stat">
+            <div class="overview-stat-label">Rollbacks today</div>
+            <div class="overview-stat-value">{state.overview.today.rollbacks}</div>
+          </div>
+          <div class="card overview-stat">
+            <div class="overview-stat-label">Services not healthy</div>
+            <div class="overview-stat-value">{unhealthy(state.overview.services)}</div>
+          </div>
+        </div>
+
+        <section e:if={state.overview.running.length > 0} class="stack is-sm">
+          <div class="overview-section-head row">
+            <h2>Running now</h2>
+          </div>
+          <div class="running-list stack">
+            <a e:for={d of state.overview.running} class="card running-row" href={`/deploys/${d.number}`}>
+              <div>
+                <div class="running-title">{d.serviceName} → {d.environment}</div>
+                <div class="running-sub">
+                  #{d.number} · {d.kind === "rollback" ? "rollback to " : ""}{d.version} · {d.userName}
+                </div>
+              </div>
+              <div class="stack is-xs">
+                <div class="running-bar" aria-hidden="true">
+                  <span e:for={seg of segments(d)} class={["running-seg", seg.state]}></span>
+                </div>
+                <div class="running-sub">{d.status === "queued" ? "queued" : d.currentStage}</div>
+              </div>
+              <div class="running-when">{duration(elapsed(d.startedAt ?? d.createdAt, null, state.now))}</div>
+            </a>
+          </div>
+        </section>
+
+        <div class="overview-body">
+          <section class="stack is-sm">
+            <div class="overview-section-head row">
+              <h2>Services</h2>
+            </div>
+            <div class="overview-grid">
+              <article e:for={s of state.overview.services} class={["card", "service-card", s.running && "is-busy"]}>
+                <div class="service-card-head row">
+                  <div>
+                    <a class="service-card-name" href={`/services/${s.slug}`}>{s.name}</a>
+                    <div class="service-card-team">{s.team} · {s.language}</div>
+                  </div>
+                </div>
+
+                <div class="service-env">
+                  <span class="service-env-name">staging</span>
+                  <span class="service-env-release" title={s.staging.currentSha ?? ""}>
+                    {s.staging.currentVersion ?? "–"} <span>{timeAgo(s.staging.currentAt, state.now)}</span>
+                  </span>
+                  <HealthBadge env={s.staging} />
+                </div>
+
+                <div class="service-env">
+                  <span class="service-env-name">production</span>
+                  <span class="service-env-release" title={s.production.currentSha ?? ""}>
+                    {s.production.currentVersion ?? "–"} <span>{timeAgo(s.production.currentAt, state.now)}</span>
+                  </span>
+                  <HealthBadge env={s.production} />
+                </div>
+
+                <a e:if={s.running} class="service-running" href={`/deploys/${s.running!.number}`}>
+                  <span>{s.running!.kind === "rollback" ? "Rolling back" : "Deploying"} {s.running!.version} to {s.running!.environment} · {s.running!.currentStage ?? "queued"}</span>
+                  <progress max={s.running!.stagesTotal} value={s.running!.stagesDone}></progress>
+                </a>
+              </article>
+            </div>
+          </section>
+
+          <aside class="overview-feed card">
+            <div class="card-head overview-section-head row">
+              <h2>Latest</h2>
+              <a href="/activity" class="text-sm">All activity</a>
+            </div>
+            <div class="card-body">
+              <DeployItem e:for={d of state.overview.recent} deploy={d} now={state.now} />
+              <p e:if={state.overview.recent.length === 0} class="overview-empty">No deploys yet.</p>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </Layout>
+  </body>
+</html>

@@ -1,0 +1,129 @@
+@import "#app/shared/styles/page.css";
+
+.service-head {
+  justify-content: space-between;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.service-envs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.env-card .card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.env-card h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+  text-transform: capitalize;
+}
+
+.env-release {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.02em;
+}
+
+.env-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.env-facts dt {
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+
+.env-facts dd {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.env-running {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--info-ink);
+}
+
+.env-running progress {
+  width: 100%;
+  height: 4px;
+}
+
+.service-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.service-body h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.release-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-1) var(--space-3);
+  align-items: center;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.release-row:first-child {
+  border-top: 0;
+}
+
+.release-version {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-semibold);
+}
+
+.release-sub {
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+
+.release-confirm {
+  grid-column: 1 / -1;
+}
+
+.release-confirm-actions {
+  justify-content: end;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.service-history-head {
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.service-history-list {
+  max-height: 40rem;
+  overflow-y: auto;
+  padding-block: var(--space-1);
+}
+
+@media (max-width: 56rem) {
+  .service-envs,
+  .service-body {
+    grid-template-columns: 1fr;
+  }
+}
