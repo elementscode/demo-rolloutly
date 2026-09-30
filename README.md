@@ -1,4 +1,4 @@
-![Rolloutly, a deploy dashboard built with Elements: the overview with a deploy running through its pipeline stages, another queued, service health for staging and production, and the latest deploys and rollbacks.](POSTER_URL)
+![Rolloutly, a deploy dashboard built with Elements: the overview with a deploy running through its pipeline stages, another queued, service health for staging and production, and the latest deploys and rollbacks.](https://elements.dev/demos/01a0f39c-487d-75b7-9ff3-7b29c3d07711/poster?v=7849fc57890b)
 
 # Rolloutly
 
@@ -6,7 +6,7 @@
 
 Deploy pipelines with streaming logs, production rollbacks, live service health, and charts of deploys per day, build time, success rate and time to recovery.
 
-**Demo:** [Rolloutly](TBD)
+**Demo:** [Rolloutly](https://elements.dev/demos/01a0f39c-487d-75b7-9ff3-7b29c3d07711)
 
 ## Agent specs
 
