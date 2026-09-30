@@ -1,0 +1,66 @@
+import "./style.css";
+import { redirect } from "@elements/app";
+import { CurrentUser, signout } from "#app/shared/services/auth";
+
+interface NavItem {
+  id: string;
+  href: string;
+  label: string;
+}
+
+const NAV: NavItem[] = [
+  { id: "overview", href: "/", label: "Overview" },
+  { id: "activity", href: "/activity", label: "Activity" },
+  { id: "insights", href: "/insights", label: "Insights" },
+];
+
+function onSignout() {
+  signout();
+  redirect("/signin");
+}
+
+<Layout (user: CurrentUser, active: string)>
+  <div class="app">
+    <header class="layout-header">
+      <div class="layout-bar page-shell is-wide row">
+        <a href="/" class="layout-brand row">
+          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect width="24" height="24" rx="6" fill="currentColor"/>
+            <path d="M6 15.5 L10.5 11 L13.5 14 L18 8.5" stroke="var(--accent-ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          rolloutly
+        </a>
+
+        <nav class="layout-nav row" aria-label="Main">
+          <a e:for={item of NAV}
+             href={item.href}
+             class={["layout-link", active === item.id && "is-active"]}
+             aria-current={active === item.id ? "page" : undefined}>
+            {item.label}
+          </a>
+          <a e:if={user.role === "admin"}
+             href="/team"
+             class={["layout-link", active === "team" && "is-active"]}
+             aria-current={active === "team" ? "page" : undefined}>
+            Team
+          </a>
+        </nav>
+
+        <div class="layout-user row">
+          <a href="/deploys/new" class="button is-primary is-sm">New deploy</a>
+          <span class="layout-who">
+            {user.name}
+            <span class="pill">{user.role}</span>
+          </span>
+          <button class="is-ghost is-sm" onclick={() => onSignout()}>Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-main layout-main">
+      <div class="page-shell is-wide">
+        <slot/>
+      </div>
+    </main>
+  </div>
+</Layout>

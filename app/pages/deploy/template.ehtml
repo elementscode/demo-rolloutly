@@ -1,0 +1,241 @@
+import "./style.css";
+import type { Listener } from "@elements/app";
+import { redirect } from "@elements/app";
+import favicon from "#app/shared/assets/favicons/favicon.svg";
+import { Layout } from "#app/shared/templates/layout";
+import { CurrentUser } from "#app/shared/services/auth";
+import { fetchDeployProgress, startDeploy } from "#app/shared/services/deploys";
+import { DeployDetail, DeployEvent, DeployRow, LogLine, Stage } from "#app/shared/services/models";
+import { clock, dateTime, duration, elapsed, shortSha, statusClass, statusLabel } from "#app/shared/format";
+
+interface DetailState {
+  deploy: DeployRow;
+  stages: Stage[];
+  logs: LogLine[];
+  now: Date;
+  stage: string;
+  follow: boolean;
+  busy: boolean;
+  dirty: boolean;
+  error: string;
+}
+
+function onLog(state: DetailState, log: LogLine) {
+  let last = state.logs.at(-1);
+  if (last && last.seq >= log.seq) {
+    return;
+  }
+
+  state.logs.push(log);
+}
+
+function onProgress(state: DetailState) {
+  if (state.busy) {
+    state.dirty = true;
+    return;
+  }
+
+  state.busy = true;
+
+  try {
+    do {
+      state.dirty = false;
+      let progress = fetchDeployProgress(state.deploy.number);
+      state.deploy = progress.deploy;
+      state.stages = progress.stages;
+    } while (state.dirty);
+  } finally {
+    state.busy = false;
+  }
+}
+
+function onStart(state: DetailState, events: Listener<DeployEvent>) {
+  events.on("notify", (event) => {
+    if (event.type === "log") {
+      onLog(state, event.log);
+      return;
+    }
+
+    onProgress(state);
+  });
+
+  setInterval(() => state.now = new Date(), 1000);
+}
+
+function onLineInsert(state: DetailState, el: Element) {
+  let log = el.parentElement;
+  if (state.follow && log) {
+    log.scrollTop = log.scrollHeight;
+  }
+}
+
+function onLogScroll(state: DetailState, el: Element) {
+  state.follow = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+}
+
+function onPickStage(state: DetailState, name: string) {
+  state.stage = state.stage === name ? "" : name;
+}
+
+function onRedeploy(state: DetailState) {
+  try {
+    let number = startDeploy({
+      serviceId: state.deploy.serviceId,
+      environment: state.deploy.environment,
+      commitId: state.deploy.commitId,
+    });
+    redirect(`/deploys/${number}`);
+  } catch (err: any) {
+    state.error = err.message;
+  }
+}
+
+function visibleLogs(state: DetailState): LogLine[] {
+  return state.stage ? state.logs.filter((l) => l.stage === state.stage) : state.logs;
+}
+
+function stageSeconds(stage: Stage, now: Date): string {
+  if (stage.status === "skipped") {
+    return "skipped";
+  }
+
+  if (stage.status === "pending") {
+    return "–";
+  }
+
+  return duration(elapsed(stage.startedAt, stage.finishedAt, now));
+}
+
+function isLive(d: DeployRow): boolean {
+  return d.status === "queued" || d.status === "running";
+}
+
+<html lang="en" class="page-deploy" (
+  user: CurrentUser,
+  detail: DeployDetail,
+  events: Listener<DeployEvent>,
+  private state: DetailState = {
+    deploy: detail.deploy,
+    stages: detail.stages,
+    logs: detail.logs,
+    now: new Date(),
+    stage: "",
+    follow: true,
+    busy: false,
+    dirty: false,
+    error: "",
+  },
+) oninit={() => onStart(state, events)}>
+  <head>
+    <title>#{detail.deploy.number} {detail.deploy.serviceName} · rolloutly</title>
+    <meta name="description" content="Deploy stages and log">
+    <link rel="icon" type="image/svg+xml" href={favicon} />
+  </head>
+  <body>
+    <Layout {user} active="">
+      <div class="stack is-xl">
+        <div class="stack is-sm">
+          <nav class="crumbs row" aria-label="Breadcrumb">
+            <a href="/">Overview</a>
+            <span>/</span>
+            <a href={`/services/${state.deploy.serviceSlug}`}>{state.deploy.serviceName}</a>
+            <span>/</span>
+            <span>#{state.deploy.number}</span>
+          </nav>
+
+          <div class="deploy-head row">
+            <div class="stack is-sm">
+              <div class="deploy-title row">
+                <h1>
+                  {state.deploy.kind === "rollback" ? "Rollback" : "Deploy"} #{state.deploy.number}
+                </h1>
+                <span class={["pill", statusClass(state.deploy.status)]}>
+                  <span class="pill-dot"></span>
+                  {statusLabel(state.deploy)}
+                </span>
+              </div>
+              <div class="deploy-meta">
+                <span><strong>{state.deploy.serviceName}</strong> → <strong>{state.deploy.environment}</strong></span>
+                <span>
+                  {state.deploy.kind === "rollback" ? "restores " : ""}
+                  <strong class="mono">{state.deploy.version}</strong>
+                  <span e:if={state.deploy.restoresNumber}> from <a href={`/deploys/${state.deploy.restoresNumber}`}>#{state.deploy.restoresNumber}</a></span>
+                </span>
+                <span class="mono">{shortSha(state.deploy.sha)}</span>
+                <span>{state.deploy.message}</span>
+              </div>
+              <div class="deploy-meta">
+                <span>Started by <strong>{state.deploy.userName ?? "someone"}</strong></span>
+                <span>{dateTime(state.deploy.createdAt)}</span>
+                <span>Total <strong>{duration(elapsed(state.deploy.startedAt, state.deploy.finishedAt, state.now))}</strong></span>
+              </div>
+            </div>
+
+            <div class="cluster">
+              <button e:if={state.deploy.status === "failed" && state.deploy.kind === "deploy"}
+                      onclick={() => onRedeploy(state)}>
+                Retry deploy
+              </button>
+              <a e:if={state.deploy.environment === "production" && !isLive(state.deploy)}
+                 class="button"
+                 href={`/services/${state.deploy.serviceSlug}#rollback`}>
+                Roll back production
+              </a>
+            </div>
+          </div>
+
+          <p e:if={state.error} class="callout is-danger" role="alert">{state.error}</p>
+
+          <div e:if={state.deploy.status === "failed" && state.deploy.failedStage === "health check" && state.deploy.environment === "production"}
+               class="callout is-warning">
+            <div class="callout-title">Production is running a release that failed its health check</div>
+            <div class="callout-body">
+              {state.deploy.version} took traffic and then failed its checks. Roll back to the previous release or ship a fix.
+            </div>
+          </div>
+        </div>
+
+        <section class="deploy-stages" aria-label="Stages">
+          <button e:for={stage of state.stages}
+                  type="button"
+                  class={["stage-card", `is-${stage.status}`, state.stage === stage.name && "is-selected"]}
+                  aria-pressed={state.stage === stage.name}
+                  onclick={() => onPickStage(state, stage.name)}>
+            <span class="stage-card-top">
+              <span class="stage-card-name">{stage.name}</span>
+              <span class={["pill", statusClass(stage.status)]}>{stage.status}</span>
+            </span>
+            <span class="stage-card-time">{stageSeconds(stage, state.now)}</span>
+            <span class="stage-card-bar">
+              <span style={`width: ${stage.status === "pending" || stage.status === "skipped" ? 0 : 100}%`}></span>
+            </span>
+          </button>
+        </section>
+
+        <section class="stack is-sm">
+          <div class="log-head row">
+            <h2>Log{state.stage ? ` · ${state.stage}` : ""}</h2>
+            <div class="cluster is-sm">
+              <button e:if={state.stage} class="is-ghost is-sm" onclick={() => state.stage = ""}>Show all stages</button>
+              <span class="text-sm">{visibleLogs(state).length} lines</span>
+            </div>
+          </div>
+
+          <div class="log" role="log" aria-live="polite" onscroll={(e) => onLogScroll(state, e.target as Element)}>
+            <div e:for={line of visibleLogs(state)}
+                 class={["log-line", `is-${line.level}`]}
+                 oninsert={(e) => onLineInsert(state, e.target)}>
+              <span class="log-time">{clock(line.createdAt)}</span>
+              <span class="log-stage">[{line.stage}]</span>
+              <span class="log-text">{line.line}</span>
+            </div>
+            <div e:if={isLive(state.deploy)} class="log-waiting">
+              {state.deploy.status === "queued" ? "waiting for a worker " : ""}
+            </div>
+            <div e:if={!isLive(state.deploy) && visibleLogs(state).length === 0} class="log-empty">No output.</div>
+          </div>
+        </section>
+      </div>
+    </Layout>
+  </body>
+</html>

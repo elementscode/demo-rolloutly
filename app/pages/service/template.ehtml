@@ -1,0 +1,220 @@
+import "./style.css";
+import type { Listener } from "@elements/app";
+import { redirect } from "@elements/app";
+import favicon from "#app/shared/assets/favicons/favicon.svg";
+import { Layout } from "#app/shared/templates/layout";
+import { DeployItem } from "#app/shared/templates/deploy-item";
+import { HealthBadge } from "#app/shared/templates/health-badge";
+import { CurrentUser } from "#app/shared/services/auth";
+import { fetchServiceDetail, rollback } from "#app/shared/services/deploys";
+import { applyHealth, DeployEvent, DeployRow, EnvState, HealthEvent, ServiceDetail } from "#app/shared/services/models";
+import { dateTime, shortSha, timeAgo } from "#app/shared/format";
+
+interface ServiceState {
+  detail: ServiceDetail;
+  now: Date;
+  confirming: string;
+  error: string;
+  busy: boolean;
+  dirty: boolean;
+  rolling: boolean;
+}
+
+function onDeployEvent(state: ServiceState) {
+  if (state.busy) {
+    state.dirty = true;
+    return;
+  }
+
+  state.busy = true;
+
+  try {
+    do {
+      state.dirty = false;
+      state.detail = fetchServiceDetail(state.detail.service.slug);
+    } while (state.dirty);
+  } finally {
+    state.busy = false;
+  }
+}
+
+function onStart(state: ServiceState, deploys: Listener<DeployEvent>, health: Listener<HealthEvent>) {
+  deploys.on("notify", () => onDeployEvent(state));
+  health.on("notify", (event) => applyHealth(state.detail.environments, event.environments));
+  setInterval(() => state.now = new Date(), 1000);
+}
+
+function onAsk(state: ServiceState, release: DeployRow) {
+  state.confirming = release.id;
+  state.error = "";
+}
+
+function onConfirm(state: ServiceState, release: DeployRow) {
+  state.rolling = true;
+  state.error = "";
+
+  try {
+    let number = rollback(release.id);
+    redirect(`/deploys/${number}`);
+  } catch (err: any) {
+    state.error = err.message;
+    state.rolling = false;
+  }
+}
+
+function running(detail: ServiceDetail, env: EnvState): DeployRow | undefined {
+  return detail.deploys.find((d) => d.environment === env.name && (d.status === "queued" || d.status === "running"));
+}
+
+function production(detail: ServiceDetail): EnvState {
+  return detail.environments.find((e) => e.name === "production")!;
+}
+
+<html lang="en" class="page-service" (
+  user: CurrentUser,
+  initial: ServiceDetail,
+  deploys: Listener<DeployEvent>,
+  health: Listener<HealthEvent>,
+  private state: ServiceState = {
+    detail: initial,
+    now: new Date(),
+    confirming: "",
+    error: "",
+    busy: false,
+    dirty: false,
+    rolling: false,
+  },
+) oninit={() => onStart(state, deploys, health)}>
+  <head>
+    <title>{initial.service.name} · rolloutly</title>
+    <meta name="description" content={initial.service.description}>
+    <link rel="icon" type="image/svg+xml" href={favicon} />
+  </head>
+  <body>
+    <Layout {user} active="">
+      <div class="stack is-xl">
+        <div class="stack is-sm">
+          <nav class="crumbs row" aria-label="Breadcrumb">
+            <a href="/">Overview</a>
+            <span>/</span>
+            <span>{state.detail.service.name}</span>
+          </nav>
+
+          <div class="service-head row">
+            <div class="stack is-xs">
+              <h1>{state.detail.service.name}</h1>
+              <p class="text-sm">{state.detail.service.team} · {state.detail.service.language} · {state.detail.service.description}</p>
+            </div>
+            <div class="cluster is-sm">
+              <a class="button" href={`/deploys/new?service=${state.detail.service.slug}&env=staging`}>Deploy to staging</a>
+              <a class="button is-primary" href={`/deploys/new?service=${state.detail.service.slug}&env=production`}>Deploy to production</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="service-envs">
+          <section e:for={env of state.detail.environments} class="card env-card">
+            <div class="card-head">
+              <h2>{env.name}</h2>
+              <HealthBadge {env} />
+            </div>
+            <div class="card-body stack">
+              <div>
+                <div class="env-release">{env.currentVersion ?? "–"}</div>
+                <div class="text-sm">
+                  <a e:if={env.currentNumber} href={`/deploys/${env.currentNumber}`}>#{env.currentNumber}</a>
+                  · <span class="mono">{shortSha(env.currentSha)}</span>
+                  · released {timeAgo(env.currentAt, state.now)}
+                </div>
+              </div>
+              <dl class="env-facts">
+                <div>
+                  <dt>p95 latency</dt>
+                  <dd>{env.latencyMs} ms</dd>
+                </div>
+                <div>
+                  <dt>Error rate</dt>
+                  <dd>{env.errorRate.toFixed(2)}%</dd>
+                </div>
+                <div>
+                  <dt>Checked</dt>
+                  <dd>{timeAgo(env.healthCheckedAt, state.now)}</dd>
+                </div>
+              </dl>
+              <a e:if={running(state.detail, env)} class="env-running" href={`/deploys/${running(state.detail, env)!.number}`}>
+                <span>
+                  {running(state.detail, env)!.kind === "rollback" ? "Rolling back to" : "Deploying"}
+                  {running(state.detail, env)!.version} · {running(state.detail, env)!.currentStage ?? "queued"}
+                </span>
+                <progress max={running(state.detail, env)!.stagesTotal} value={running(state.detail, env)!.stagesDone}></progress>
+              </a>
+            </div>
+          </section>
+        </div>
+
+        <div class="service-body">
+          <section id="rollback" class="card">
+            <div class="card-head stack is-xs">
+              <h2>Roll back production</h2>
+              <p class="text-sm">
+                Production runs <span class="mono">{production(state.detail).currentVersion ?? "nothing"}</span>.
+                Pick an earlier release to restore.
+              </p>
+            </div>
+            <div class="card-body">
+              <p e:if={state.error} class="callout is-danger" role="alert">{state.error}</p>
+
+              <div e:for={release of state.detail.releases} class="release-row">
+                <div>
+                  <div>
+                    <span class="release-version">{release.version}</span>
+                    <span class="text-sm"> {release.message}</span>
+                  </div>
+                  <div class="release-sub">
+                    <a href={`/deploys/${release.number}`}>#{release.number}</a>
+                    · <span class="mono">{shortSha(release.sha)}</span>
+                    · shipped {dateTime(release.createdAt)} by {release.userName ?? "someone"}
+                  </div>
+                </div>
+
+                <button e:if={state.confirming !== release.id}
+                        class="is-sm"
+                        onclick={() => onAsk(state, release)}>
+                  Roll back
+                </button>
+
+                <div e:if={state.confirming === release.id} class="release-confirm callout is-warning" role="alertdialog" aria-label="Confirm rollback">
+                  <div class="callout-title">
+                    Roll production back from {production(state.detail).currentVersion} to {release.version}?
+                  </div>
+                  <div class="callout-body">
+                    Traffic moves to {release.version} on every instance. Anything shipped since goes out of production until it is deployed again.
+                  </div>
+                  <div class="release-confirm-actions row">
+                    <button class="is-ghost is-sm" onclick={() => state.confirming = ""}>Cancel</button>
+                    <button class={["is-danger", "is-sm", state.rolling && "is-loading"]}
+                            onclick={() => onConfirm(state, release)}>
+                      Roll back to {release.version}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <p e:if={state.detail.releases.length === 0} class="text-sm">No earlier production release to restore.</p>
+            </div>
+          </section>
+
+          <section class="card service-history">
+            <div class="card-head row service-history-head">
+              <h2>History</h2>
+              <span class="text-sm">last {state.detail.deploys.length}</span>
+            </div>
+            <div class="card-body service-history-list">
+              <DeployItem e:for={d of state.detail.deploys} deploy={d} now={state.now} />
+            </div>
+          </section>
+        </div>
+      </div>
+    </Layout>
+  </body>
+</html>

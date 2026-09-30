@@ -1,0 +1,231 @@
+@import "#app/shared/styles/page.css";
+
+.deploy-head {
+  justify-content: space-between;
+  align-items: start;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.deploy-title {
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.deploy-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.deploy-meta strong {
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+}
+
+.deploy-stages {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--space-3);
+}
+
+.stage-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  height: auto;
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  font-weight: var(--weight-regular);
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+
+.stage-card:hover {
+  border-color: var(--rule-strong);
+}
+
+.stage-card.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.stage-card.is-running {
+  border-color: var(--info-edge);
+}
+
+.stage-card.is-failed {
+  border-color: var(--danger-edge);
+}
+
+.stage-card.is-skipped,
+.stage-card.is-pending {
+  color: var(--ink-soft);
+}
+
+.stage-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.stage-card-name {
+  font-weight: var(--weight-medium);
+  text-transform: capitalize;
+}
+
+.stage-card-time {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.02em;
+  line-height: var(--leading-tight);
+}
+
+.stage-card.is-skipped .stage-card-time,
+.stage-card.is-pending .stage-card-time {
+  color: var(--ink-dim);
+}
+
+.stage-card-bar {
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+
+.stage-card-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ink-dim);
+}
+
+.stage-card.is-succeeded .stage-card-bar span {
+  background: var(--success);
+}
+
+.stage-card.is-failed .stage-card-bar span {
+  background: var(--danger);
+}
+
+.stage-card.is-running .stage-card-bar span {
+  background: var(--info);
+  animation: stage-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes stage-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.log-head {
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.log-head h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.log {
+  max-height: 32rem;
+  min-height: 10rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-3) 0;
+  border-radius: var(--radius-lg);
+  background: var(--terminal-bg);
+  color: var(--terminal-ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.7;
+}
+
+.log-line {
+  display: grid;
+  grid-template-columns: 5.5rem 7.5rem 1fr;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+}
+
+.log-line:hover {
+  background: color-mix(in oklab, var(--terminal-ink) 6%, transparent);
+}
+
+.log-time,
+.log-stage {
+  color: var(--terminal-dim);
+  white-space: nowrap;
+}
+
+.log-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log-line.is-warn .log-text {
+  color: var(--warning-300);
+}
+
+.log-line.is-error .log-text {
+  color: var(--danger-300);
+}
+
+.log-empty,
+.log-waiting {
+  padding: 0 var(--space-4);
+  color: var(--terminal-dim);
+}
+
+.log-waiting::after {
+  content: "▍";
+  animation: log-blink 1s steps(2) infinite;
+}
+
+@keyframes log-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 40rem) {
+  .deploy-stages {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .stage-card:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .log-line {
+    grid-template-columns: auto 1fr;
+    gap: 0 var(--space-2);
+    padding-block: var(--space-1);
+  }
+
+  .log-text {
+    grid-column: 1 / -1;
+  }
+
+  .log {
+    height: 24rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-card.is-running .stage-card-bar span,
+  .log-waiting::after {
+    animation: none;
+  }
+}

@@ -1,0 +1,11 @@
+import "./style.css";
+import { EnvState } from "#app/shared/services/models";
+import { healthClass } from "#app/shared/format";
+
+<HealthBadge (env: EnvState)>
+  <span class={["pill", "health-badge", healthClass(env.health)]}
+        title={`${env.latencyMs}ms p95 · ${env.errorRate.toFixed(2)}% errors`}>
+    <span class="pill-dot"></span>
+    {env.health}
+  </span>
+</HealthBadge>
