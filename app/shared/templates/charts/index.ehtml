@@ -1,0 +1,281 @@
+import "./style.css";
+import { DayCount, DayValue, Recovery } from "#app/shared/services/models";
+import { duration } from "#app/shared/format";
+import {
+  areaPath,
+  band,
+  bandCenter,
+  columnPath,
+  dayLabels,
+  H,
+  lastValue,
+  linePath,
+  niceMax,
+  PAD,
+  percentLeft,
+  percentTop,
+  PLOT_H,
+  PLOT_W,
+  shortDay,
+  ticks,
+  W,
+  yScale,
+} from "#app/shared/charts";
+
+export type Unit = "seconds" | "percent" | "minutes";
+
+interface Hover {
+  i: number;
+  id?: string;
+}
+
+interface Column {
+  id: string;
+  x: number;
+  w: number;
+  ok: string;
+  fail: string;
+}
+
+interface Dot {
+  id: string;
+  i: number;
+  x: number;
+  y: number;
+  open: boolean;
+  r: Recovery;
+}
+
+function formatValue(v: number, unit: Unit): string {
+  switch (unit) {
+    case "percent":
+      return `${Math.round(v)}%`;
+
+    case "minutes":
+      return duration(v * 60);
+
+    default:
+      return duration(v);
+  }
+}
+
+function slots(count: number): Hover[] {
+  return Array.from({ length: count }, (_, i) => ({ i, id: `s${i}` }));
+}
+
+function tipSide(x: number): string {
+  let f = x / W;
+
+  return f > 0.78 ? "is-left" : f < 0.22 ? "is-right" : "";
+}
+
+function columnMax(data: DayCount[]): number {
+  return niceMax(Math.max(1, ...data.map((d) => d.succeeded + d.failed)));
+}
+
+function columns(data: DayCount[]): Column[] {
+  let max = columnMax(data);
+  let bw = Math.min(24, band(data.length) * 0.66);
+  let base = PAD.top + PLOT_H;
+  let unit = PLOT_H / max;
+
+  return data.map((d, i) => {
+    let x = bandCenter(i, data.length) - bw / 2;
+    let hOk = d.succeeded * unit;
+    let hFail = d.failed * unit;
+    let gap = hOk > 0 && hFail > 0 ? 2 : 0;
+
+    return {
+      id: `c${i}`,
+      x,
+      w: bw,
+      ok: columnPath(x, base - hOk, bw, hOk, hFail === 0),
+      fail: columnPath(x, base - hOk - gap - hFail, bw, hFail, true),
+    };
+  });
+}
+
+function values(points: DayValue[]): (number | null)[] {
+  return points.map((p) => p.value);
+}
+
+function lineMax(points: DayValue[], unit: Unit): number {
+  return unit === "percent" ? 100 : niceMax(Math.max(1, ...points.map((p) => p.value ?? 0)), unit === "seconds" ? "seconds" : "minutes");
+}
+
+function lineMin(unit: Unit): number {
+  return unit === "percent" ? 50 : 0;
+}
+
+function lineY(points: DayValue[], unit: Unit): (v: number) => number {
+  let min = lineMin(unit);
+
+  return (v) => yScale(min, lineMax(points, unit))(Math.max(min, v));
+}
+
+function dotsMax(recoveries: Recovery[]): number {
+  return niceMax(Math.max(30, ...recoveries.map((r) => r.minutes ?? 0)), "minutes");
+}
+
+function dots(recoveries: Recovery[], start: Date, end: Date): Dot[] {
+  let max = dotsMax(recoveries);
+  let y = yScale(0, max);
+  let span = end.getTime() - start.getTime() || 1;
+
+  return recoveries.map((r, i) => ({
+    id: r.deployId,
+    i,
+    x: PAD.left + ((r.failedAt.getTime() - start.getTime()) / span) * PLOT_W,
+    y: r.minutes === null ? PAD.top : y(r.minutes),
+    open: r.minutes === null,
+    r,
+  }));
+}
+
+function dayEnd(days: Date[]): Date {
+  let last = days.at(-1) ?? new Date();
+
+  return new Date(last.getTime() + 86_400_000);
+}
+
+<ColumnChart (data: DayCount[], private hover: Hover = { i: -1 })>
+  <div class="chart" onmouseleave={() => hover.i = -1}>
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Deploys per day, succeeded and failed">
+      <g e:for={t of ticks(0, columnMax(data), 4, (v) => String(Math.round(v)))}>
+        <line class={t.value === 0 ? "chart-baseline" : "chart-grid"} x1={PAD.left} x2={W - PAD.right} y1={t.y} y2={t.y} />
+        <text class="chart-tick" x={PAD.left - 8} y={t.y + 4} text-anchor="end">{t.label}</text>
+      </g>
+      <text e:for={l of dayLabels(data.map((d) => d.day))} class="chart-tick" x={l.x} y={H - 6} text-anchor="middle">{l.label}</text>
+
+      <rect e:if={hover.i >= 0}
+            class="chart-hover-band"
+            x={bandCenter(hover.i, data.length) - band(data.length) / 2}
+            y={PAD.top}
+            width={band(data.length)}
+            height={PLOT_H} />
+
+      <g e:for={c of columns(data)}>
+        <path class="chart-col-ok" d={c.ok} />
+        <path class="chart-col-fail" d={c.fail} />
+      </g>
+
+      <rect e:for={slot of slots(data.length)}
+            class="chart-hit"
+            x={bandCenter(slot.i, data.length) - band(data.length) / 2}
+            y={PAD.top}
+            width={band(data.length)}
+            height={PLOT_H}
+            onmouseenter={() => hover.i = slot.i}
+            onclick={() => hover.i = slot.i} />
+    </svg>
+
+    <div e:if={hover.i >= 0 && data[hover.i]}
+         class={["chart-tip", tipSide(bandCenter(hover.i, data.length))]}
+         style={`left: ${percentLeft(bandCenter(hover.i, data.length))}; top: ${percentTop(PAD.top + 8)}`}>
+      <div class="chart-tip-title">{shortDay(data[hover.i].day)}</div>
+      <div class="chart-tip-row"><span><span class="chart-key"></span>succeeded</span><strong>{data[hover.i].succeeded}</strong></div>
+      <div class="chart-tip-row"><span><span class="chart-key is-fail"></span>failed</span><strong>{data[hover.i].failed}</strong></div>
+    </div>
+  </div>
+</ColumnChart>
+
+<LineChart (points: DayValue[], unit: Unit, label: string, private hover: Hover = { i: -1 })>
+  <div class="chart" onmouseleave={() => hover.i = -1}>
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label}>
+      <g e:for={t of ticks(lineMin(unit), lineMax(points, unit), unit === "percent" ? 5 : 4, (v) => formatValue(v, unit))}>
+        <line class={t.value === lineMin(unit) ? "chart-baseline" : "chart-grid"} x1={PAD.left} x2={W - PAD.right} y1={t.y} y2={t.y} />
+        <text class="chart-tick" x={PAD.left - 8} y={t.y + 4} text-anchor="end">{t.label}</text>
+      </g>
+      <text e:for={l of dayLabels(points.map((p) => p.day))} class="chart-tick" x={l.x} y={H - 6} text-anchor="middle">{l.label}</text>
+
+      <path class="chart-area" d={areaPath(values(points), lineY(points, unit), PAD.top + PLOT_H)} />
+      <path class="chart-line" d={linePath(values(points), lineY(points, unit))} />
+
+      <line e:if={hover.i >= 0}
+            class="chart-cross"
+            x1={bandCenter(hover.i, points.length)}
+            x2={bandCenter(hover.i, points.length)}
+            y1={PAD.top}
+            y2={PAD.top + PLOT_H} />
+
+      <circle e:if={hover.i >= 0 && points[hover.i]?.value !== null}
+              class="chart-dot"
+              cx={bandCenter(hover.i, points.length)}
+              cy={lineY(points, unit)(points[hover.i]?.value ?? 0)}
+              r="5" />
+
+      <circle e:if={hover.i < 0 && lastValue(values(points))}
+              class="chart-dot"
+              cx={bandCenter(lastValue(values(points))?.i ?? 0, points.length)}
+              cy={lineY(points, unit)(lastValue(values(points))?.v ?? 0)}
+              r="5" />
+
+      <rect e:for={slot of slots(points.length)}
+            class="chart-hit"
+            x={bandCenter(slot.i, points.length) - band(points.length) / 2}
+            y={PAD.top}
+            width={band(points.length)}
+            height={PLOT_H}
+            onmouseenter={() => hover.i = slot.i}
+            onclick={() => hover.i = slot.i} />
+    </svg>
+
+    <div e:if={hover.i >= 0 && points[hover.i]}
+         class={["chart-tip", tipSide(bandCenter(hover.i, points.length))]}
+         style={`left: ${percentLeft(bandCenter(hover.i, points.length))}; top: ${percentTop(points[hover.i].value === null ? PAD.top + PLOT_H / 2 : lineY(points, unit)(points[hover.i].value!))}`}>
+      <div class="chart-tip-title">{shortDay(points[hover.i].day)}</div>
+      <div class="chart-tip-row">
+        <span>{label}</span>
+        <strong>{points[hover.i].value === null ? "no deploys" : formatValue(points[hover.i].value!, unit)}</strong>
+      </div>
+    </div>
+  </div>
+</LineChart>
+
+<DotChart (recoveries: Recovery[], mean: number | null, days: Date[], private hover: Hover = { i: -1 })>
+  <div class="chart" onmouseleave={() => hover.i = -1}>
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Time to recovery for each failed production deploy">
+      <g e:for={t of ticks(0, dotsMax(recoveries), 4, (v) => formatValue(v, "minutes"))}>
+        <line class={t.value === 0 ? "chart-baseline" : "chart-grid"} x1={PAD.left} x2={W - PAD.right} y1={t.y} y2={t.y} />
+        <text class="chart-tick" x={PAD.left - 8} y={t.y + 4} text-anchor="end">{t.label}</text>
+      </g>
+      <text e:for={l of dayLabels(days)} class="chart-tick" x={l.x} y={H - 6} text-anchor="middle">{l.label}</text>
+
+      <g e:if={mean !== null}>
+        <line class="chart-mean"
+              x1={PAD.left}
+              x2={W - PAD.right}
+              y1={yScale(0, dotsMax(recoveries))(mean!)}
+              y2={yScale(0, dotsMax(recoveries))(mean!)} />
+        <text class="chart-end-label" x={W - PAD.right} y={yScale(0, dotsMax(recoveries))(mean!) - 6} text-anchor="end">
+          mean {formatValue(mean!, "minutes")}
+        </text>
+      </g>
+
+      <circle e:for={d of dots(recoveries, days[0] ?? new Date(), dayEnd(days))}
+              class={d.open ? "chart-dot is-open" : "chart-dot"}
+              cx={d.x}
+              cy={d.y}
+              r={hover.i === d.i ? 6.5 : 5} />
+
+      <circle e:for={d of dots(recoveries, days[0] ?? new Date(), dayEnd(days))}
+              class="chart-hit"
+              cx={d.x}
+              cy={d.y}
+              r="12"
+              onmouseenter={() => hover.i = d.i}
+              onclick={() => hover.i = d.i} />
+    </svg>
+
+    <div e:if={hover.i >= 0 && recoveries[hover.i]}
+         class={["chart-tip", tipSide(dots(recoveries, days[0] ?? new Date(), dayEnd(days))[hover.i].x)]}
+         style={`left: ${percentLeft(dots(recoveries, days[0] ?? new Date(), dayEnd(days))[hover.i].x)}; top: ${percentTop(dots(recoveries, days[0] ?? new Date(), dayEnd(days))[hover.i].y)}`}>
+      <div class="chart-tip-title">{recoveries[hover.i].serviceName} #{recoveries[hover.i].number}</div>
+      <div class="chart-tip-row"><span>failed</span><strong>{shortDay(recoveries[hover.i].failedAt)}</strong></div>
+      <div class="chart-tip-row">
+        <span>recovered in</span>
+        <strong>{recoveries[hover.i].minutes === null ? "not yet" : formatValue(recoveries[hover.i].minutes!, "minutes")}</strong>
+      </div>
+    </div>
+  </div>
+</DotChart>

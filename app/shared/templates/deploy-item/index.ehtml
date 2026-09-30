@@ -1,0 +1,57 @@
+import "./style.css";
+import { DeployRow } from "#app/shared/services/models";
+import { duration, elapsed, shortSha, statusLabel, timeAgo } from "#app/shared/format";
+
+function verb(d: DeployRow): string {
+  if (d.kind === "rollback") {
+    return d.status === "failed" ? "rollback failed on" : "rolled back";
+  }
+
+  switch (d.status) {
+    case "queued":
+      return "queued for";
+
+    case "running":
+      return "deploying to";
+
+    case "failed":
+      return "failed on";
+
+    default:
+      return "deployed to";
+  }
+}
+
+<DeployItem (deploy: DeployRow, now: Date)>
+  <a class="deploy-item" href={`/deploys/${deploy.number}`}>
+    <span class={["deploy-item-icon", `is-${deploy.status}`]} aria-hidden="true">
+      <svg e:if={deploy.status === "succeeded" && deploy.kind === "rollback"} width="12" height="12" viewBox="0 0 12 12">
+        <path d="M4.5 2 L1.5 5 L4.5 8 M1.8 5 H7.5 A3 3 0 0 1 7.5 11 H6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <svg e:elseif={deploy.status === "succeeded"} width="12" height="12" viewBox="0 0 12 12">
+        <path d="M2.5 6.5 L5 9 L9.5 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <svg e:elseif={deploy.status === "failed"} width="12" height="12" viewBox="0 0 12 12">
+        <path d="M3 3 L9 9 M9 3 L3 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      <svg e:else width="12" height="12" viewBox="0 0 12 12">
+        <path d="M6 1.5 A4.5 4.5 0 1 1 1.5 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </span>
+
+    <span class="deploy-item-title">
+      {deploy.serviceName} {verb(deploy)} {deploy.environment}
+      <span class="deploy-item-version">{deploy.version}</span>
+    </span>
+
+    <span class="deploy-item-when" title={deploy.createdAt.toLocaleString()}>{timeAgo(deploy.createdAt, now)}</span>
+
+    <span class="deploy-item-meta">
+      #{deploy.number}
+      <span e:if={deploy.kind === "rollback" && deploy.restoresNumber}> · restores #{deploy.restoresNumber}</span>
+      · {deploy.status === "succeeded" ? shortSha(deploy.sha) : statusLabel(deploy)}
+      · {duration(elapsed(deploy.startedAt, deploy.finishedAt, now))}
+      <span e:if={deploy.userName}> · {deploy.userName}</span>
+    </span>
+  </a>
+</DeployItem>

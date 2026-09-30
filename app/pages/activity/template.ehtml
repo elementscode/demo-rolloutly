@@ -1,0 +1,199 @@
+import "./style.css";
+import type { Listener } from "@elements/app";
+import favicon from "#app/shared/assets/favicons/favicon.svg";
+import { Layout } from "#app/shared/templates/layout";
+import { DeployItem } from "#app/shared/templates/deploy-item";
+import { CurrentUser } from "#app/shared/services/auth";
+import { fetchActivity } from "#app/shared/services/deploys";
+import { DeployEvent, DeployRow, Service } from "#app/shared/services/models";
+
+type Kind = "all" | "deploy" | "rollback" | "failed";
+
+interface Filter {
+  id: Kind;
+  label: string;
+}
+
+interface Day {
+  id: string;
+  label: string;
+  items: DeployRow[];
+}
+
+interface ActivityState {
+  rows: DeployRow[];
+  limit: number;
+  kind: Kind;
+  serviceId: string;
+  environment: string;
+  now: Date;
+  busy: boolean;
+  dirty: boolean;
+}
+
+const FILTERS: Filter[] = [
+  { id: "all", label: "All" },
+  { id: "deploy", label: "Deploys" },
+  { id: "rollback", label: "Rollbacks" },
+  { id: "failed", label: "Failures" },
+];
+
+function onDeployEvent(state: ActivityState) {
+  if (state.busy) {
+    state.dirty = true;
+    return;
+  }
+
+  state.busy = true;
+
+  try {
+    do {
+      state.dirty = false;
+      state.rows = fetchActivity(state.limit);
+    } while (state.dirty);
+  } finally {
+    state.busy = false;
+  }
+}
+
+function onMore(state: ActivityState) {
+  state.limit += 100;
+  onDeployEvent(state);
+}
+
+function onStart(state: ActivityState, events: Listener<DeployEvent>) {
+  events.on("notify", () => onDeployEvent(state));
+  setInterval(() => state.now = new Date(), 1000);
+}
+
+function matches(state: ActivityState, d: DeployRow): boolean {
+  if (state.serviceId && d.serviceId !== state.serviceId) {
+    return false;
+  }
+
+  if (state.environment && d.environment !== state.environment) {
+    return false;
+  }
+
+  switch (state.kind) {
+    case "deploy":
+      return d.kind === "deploy";
+
+    case "rollback":
+      return d.kind === "rollback";
+
+    case "failed":
+      return d.status === "failed";
+
+    default:
+      return true;
+  }
+}
+
+function dayLabel(date: Date, now: Date): string {
+  let today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  let day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+
+  if (day === today) {
+    return "Today";
+  }
+
+  if (day === today - 86_400_000) {
+    return "Yesterday";
+  }
+
+  return date.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
+}
+
+function days(state: ActivityState): Day[] {
+  let list: Day[] = [];
+
+  for (let d of state.rows) {
+    if (!matches(state, d)) {
+      continue;
+    }
+
+    let id = d.createdAt.toDateString();
+    let last = list.at(-1);
+
+    if (last && last.id === id) {
+      last.items.push(d);
+    } else {
+      list.push({ id, label: dayLabel(d.createdAt, state.now), items: [d] });
+    }
+  }
+
+  return list;
+}
+
+<html lang="en" class="page-activity" (
+  user: CurrentUser,
+  services: Service[],
+  initial: DeployRow[],
+  events: Listener<DeployEvent>,
+  private state: ActivityState = {
+    rows: initial,
+    limit: initial.length,
+    kind: "all" as Kind,
+    serviceId: "",
+    environment: "",
+    now: new Date(),
+    busy: false,
+    dirty: false,
+  },
+) oninit={() => onStart(state, events)}>
+  <head>
+    <title>Activity · rolloutly</title>
+    <meta name="description" content="Every deploy and rollback across all services">
+    <link rel="icon" type="image/svg+xml" href={favicon} />
+  </head>
+  <body>
+    <Layout {user} active="activity">
+      <div class="activity stack is-lg">
+        <div class="stack is-xs">
+          <h1>Activity</h1>
+          <p class="text-sm">Every deploy and rollback across all services, as it happens.</p>
+        </div>
+
+        <div class="activity-filters row">
+          <div class="tabs">
+            <div class="tab-list" role="tablist">
+              <button e:for={f of FILTERS}
+                      role="tab"
+                      aria-selected={state.kind === f.id}
+                      class={["tab", state.kind === f.id && "is-active"]}
+                      onclick={() => state.kind = f.id}>
+                {f.label}
+              </button>
+            </div>
+          </div>
+
+          <div class="activity-selects row">
+            <select aria-label="Service" class="is-sm" value={state.serviceId}>
+              <option value="">All services</option>
+              <option e:for={s of services} value={s.id}>{s.name}</option>
+            </select>
+            <select aria-label="Environment" class="is-sm" value={state.environment}>
+              <option value="">Both environments</option>
+              <option value="staging">Staging</option>
+              <option value="production">Production</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="stack is-sm">
+          <section e:for={day of days(state)} class="activity-day">
+            <h2 class="activity-day-label">{day.label}</h2>
+            <DeployItem e:for={d of day.items} deploy={d} now={state.now} />
+          </section>
+
+          <p e:if={days(state).length === 0} class="activity-empty">Nothing matches these filters in the loaded history.</p>
+        </div>
+
+        <div e:if={state.rows.length >= state.limit} class="activity-more row">
+          <button onclick={() => onMore(state)}>Load older</button>
+        </div>
+      </div>
+    </Layout>
+  </body>
+</html>
