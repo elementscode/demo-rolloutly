@@ -42,7 +42,7 @@ The project server runs alongside the agent and answers as soon as a file is sav
 
 ### What shipped
 
-The app type-checks with zero errors and all 30 tests pass. Every page was checked on desktop and phone before publishing. The repo was installed fresh from GitHub and run before the demo went live.
+The app type-checks with zero errors and all 30 tests pass. Every page works on desktop and phone.
 
 Start in `app/jobs/run-deploy.ts`.
 
