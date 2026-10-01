@@ -38,7 +38,7 @@ Rolloutly needed deploy pipelines that stream their logs, production rollbacks, 
 
 ### What the agent got from the tooling
 
-The agent ran 35 builds in 29 minutes. By the build's own timer, the median build finished in 30 milliseconds, so it checked its work after each edit and kept going. The build caught errors such as a malformed `e:for` loop variable and async callbacks in a test helper that did not await them, each with a message that showed the corrected code. The agent read 40 manual pages as it reached each part, from `recipes/live-dashboard` and `channel` to `style/components/terminal`, then wrote 30 tests and checked its pages at phone width in a real browser.
+The agent ran 35 builds in 29 minutes, checking its work after each edit and moving straight on. The build caught errors such as a malformed `e:for` loop variable and async callbacks in a test helper that did not await them, each with a message that showed the corrected code. The agent read 40 manual pages as it reached each part, from `recipes/live-dashboard` and `channel` to `style/components/terminal`, then wrote 30 tests and checked its pages at phone width in a real browser.
 
 Start in `app/jobs/run-deploy.ts`.
 
