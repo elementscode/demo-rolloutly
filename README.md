@@ -36,9 +36,13 @@ Rolloutly needed deploy pipelines that stream their logs, production rollbacks, 
 - **Server calls as function calls.** Pages call `@rpc` functions such as `startDeploy`, `fetchServiceDetail` and `fetchInsights` straight from the template, and the team page calls `setRole` and `addMember`.
 - **Data and roles from SQL.** Two migrations define the platform and seed one admin, three engineers, twelve services and thirty days of deploy history with failures and rollbacks. `requireAdminOrThrow` in `app/shared/services/auth.ts` gives admins the team page.
 
-### What the agent got from the tooling
+### What the project server gave the agent
 
-The agent ran 35 builds in 29 minutes, checking its work after each edit and moving straight on. The build caught errors such as a malformed `e:for` loop variable and async callbacks in a test helper that did not await them, each with a message that showed the corrected code. The agent read 40 manual pages as it reached each part, from `recipes/live-dashboard` and `channel` to `style/components/terminal`, then wrote 30 tests and checked its pages at phone width in a real browser.
+The project server runs alongside the agent and answers as soon as a file is saved: it type-checks the templates, TypeScript and SQL, applies migrations and reruns the tests, so every question came back right away and the agent kept building.
+
+### What shipped
+
+The app type-checks with zero errors and all 30 tests pass. Every page was checked on desktop and phone before publishing. The repo was installed fresh from GitHub and run before the demo went live.
 
 Start in `app/jobs/run-deploy.ts`.
 
