@@ -1,30 +1,16 @@
-![Rolloutly, a deploy dashboard built with Elements: the overview with a deploy running through its pipeline stages, another queued, service health for staging and production, and the latest deploys and rollbacks.](https://elements.dev/demos/01a0f39c-487d-75b7-9ff3-7b29c3d07711/poster?v=7849fc57890b)
+![A deploy dashboard with live logs, built by Claude Code on Elements: the overview with a deploy running through its pipeline stages, another queued, service health for staging and production, and the latest deploys and rollbacks.](https://elements.dev/demos/01a0f39c-487d-75b7-9ff3-7b29c3d07711/poster?v=7849fc57890b)
 
-# Rolloutly
+# A deploy dashboard with live logs, built by Claude Code on Elements
 
-> A demo app built with [Elements](https://elements.dev).
+> Rolloutly is a full-stack app built with Claude Code on Elements.
 
 Deploy pipelines with streaming logs, production rollbacks, live service health, and charts of deploys per day, build time, success rate and time to recovery.
 
-**Demo:** [Rolloutly](https://elements.dev/demos/01a0f39c-487d-75b7-9ff3-7b29c3d07711)
-
-## Agent specs
-
-- **Agent:** Claude Code, Opus 5.5 Medium
-- **Time:** 29 min
-- **Cost:** $9.68 at API rates, September 2026
-
-## Get started
-
-```bash
-elements create rolloutly -scaffold=elementscode/demo-rolloutly
-```
+[Run this app on your machine](https://elements.dev/demos/01a0f39c-487d-75b7-9ff3-7b29c3d07711). Use this demo as inspiration, or as the starting point for your own app. Your agent creates a new app with this one as the scaffold, and you prompt it to add whatever features you want.
 
 ## How it's built
 
 Rolloutly needed deploy pipelines that stream their logs, production rollbacks, service health that refreshes itself, charts of a month of deploys and roles for the team. Each of those is a part of Elements, so the agent spent its 29 minutes on the dashboard itself.
-
-### What Elements gave the app
 
 - **Streaming deploys.** A deploy is a job that walks each stage and sends every log line, stage change and final status on a channel. The deploy page prints the log as it runs, and the overview, service and activity pages pick up each status change.
 
@@ -38,34 +24,6 @@ Rolloutly needed deploy pipelines that stream their logs, production rollbacks, 
 
 - **Data and roles from SQL.** Migrations define the platform and seed one admin, three engineers, twelve services and thirty days of deploy history with failures and rollbacks. Sessions and roles give admins the team page.
 
-### What the project server gave the agent
+## Why Elements
 
-The project server runs alongside the agent and answers as soon as a file is saved: it type-checks the templates, TypeScript and SQL, applies migrations and reruns the tests, so every question came back right away and the agent kept building.
-
-### What shipped
-
-The app type-checks with zero errors and all 30 tests pass. Every page works on desktop and phone.
-
-## Seed data and demo accounts
-
-The seed creates twelve services, each with a staging and a production
-environment, and thirty days of deploy history up to the day you run it:
-about 650 deploys with stage timings, logs, failures and rollbacks, plus a
-build slowdown in mid-September so the build duration chart has something to
-show. The sign-in page lists the four accounts; click one to sign in.
-
-| Email               | Password        | Role     |
-| ------------------- | --------------- | -------- |
-| priya@rolloutly.dev | `rollout-admin` | admin    |
-| maya@rolloutly.dev  | `rollout-demo`  | engineer |
-| diego@rolloutly.dev | `rollout-demo`  | engineer |
-| sam@rolloutly.dev   | `rollout-demo`  | engineer |
-
-Engineers deploy and roll back. The admin also manages accounts on the Team
-page.
-
-**Demo:** [Rolloutly](https://elements.dev/demos/01a0f39c-487d-75b7-9ff3-7b29c3d07711)
-
-## License
-
-MIT. See [LICENSE](LICENSE).
+Elements is an integrated full-stack app framework and a project server. The project server checks the agent's work as it builds: it type-checks the server and browser code, analyzes the program, applies migrations and runs the tests, then reports the results to the agent. A security mistake, such as calling a server-only function from the browser, is a compile error. The agent reads the report and fixes its own mistakes before it tells you a feature is done. The same checks run on every feature you ask for next.
