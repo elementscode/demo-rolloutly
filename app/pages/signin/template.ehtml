@@ -1,6 +1,12 @@
 import "./style.css";
 import { redirect } from "@elements/app";
 import { DemoLogin, signin } from "#app/shared/services/auth";
+import { Alert } from "@elements/ui/alert";
+import { Badge } from "@elements/ui/badge";
+import { Button } from "@elements/ui/button";
+import { Card } from "@elements/ui/card";
+import { Field } from "@elements/ui/field";
+import { Input } from "@elements/ui/input";
 
 interface SigninForm {
   email: string;
@@ -53,38 +59,27 @@ function onPick(form: SigninForm, login: DemoLogin) {
             <p class="text-sm">Deploys, rollbacks and health for every service.</p>
           </div>
 
-          <p e:if={form.error} class="callout is-danger" role="alert">{form.error}</p>
+          <Alert e:if={form.error} variant="danger" description={form.error} />
 
-          <div class="field">
-            <label for="email">Email</label>
-            <input id="email"
+          <Field label="Email" required>
+            <Input type="email"
                    name="email"
-                   type="email"
                    value={form.email}
-                   autocomplete="email"
-                   autocapitalize="none"
-                   spellcheck={false}
                    placeholder="you@rolloutly.dev"
-                   required>
-          </div>
+                   attrs={{ id: "email", autocomplete: "email", autocapitalize: "none", spellcheck: "false" }} />
+          </Field>
 
-          <div class="field">
-            <label for="password">Password</label>
-            <input id="password"
+          <Field label="Password" required>
+            <Input type="password"
                    name="password"
-                   type="password"
                    value={form.password}
-                   autocomplete="current-password"
-                   required>
-          </div>
+                   attrs={{ id: "password", autocomplete: "current-password" }} />
+          </Field>
 
-          <button type="submit" class={["is-primary", form.busy && "is-loading"]}>Sign in</button>
+          <Button type="submit" variant="primary" block loading={form.busy}>Sign in</Button>
         </form>
 
-        <section class="card">
-          <div class="card-head">
-            <h2 class="text-md">Demo accounts</h2>
-          </div>
+        <Card title="Demo accounts" level={2}>
           <div class="signin-logins stack">
             <button e:for={login of logins}
                     type="button"
@@ -92,12 +87,12 @@ function onPick(form: SigninForm, login: DemoLogin) {
                     onclick={() => onPick(form, login)}>
               <span class="signin-login-top">
                 <span class="signin-login-name">{login.name}</span>
-                <span class={["pill", login.role === "admin" && "is-accent"]}>{login.role}</span>
+                <Badge variant={login.role === "admin" ? "accent" : "secondary"}>{login.role}</Badge>
               </span>
               <span class="signin-login-cred">{login.email} / {login.password}</span>
             </button>
           </div>
-        </section>
+        </Card>
       </div>
     </main>
   </body>
