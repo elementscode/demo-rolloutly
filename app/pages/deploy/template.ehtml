@@ -3,10 +3,14 @@ import type { Listener } from "@elements/app";
 import { redirect } from "@elements/app";
 import favicon from "#app/shared/assets/favicons/favicon.svg";
 import { Layout } from "#app/shared/templates/layout";
+import { Alert } from "@elements/ui/alert";
+import { Badge } from "@elements/ui/badge";
+import { Breadcrumb } from "@elements/ui/breadcrumb";
+import { Button } from "@elements/ui/button";
 import { CurrentUser } from "#app/shared/services/auth";
 import { fetchDeployProgress, startDeploy } from "#app/shared/services/deploys";
 import { DeployDetail, DeployEvent, DeployRow, LogLine, Stage } from "#app/shared/services/models";
-import { clock, dateTime, duration, elapsed, shortSha, statusClass, statusLabel } from "#app/shared/format";
+import { clock, dateTime, duration, elapsed, shortSha, statusLabel, statusVariant } from "#app/shared/format";
 
 interface DetailState {
   deploy: DeployRow;
@@ -135,13 +139,12 @@ function isLive(d: DeployRow): boolean {
     <Layout {user} active="">
       <div class="stack is-xl">
         <div class="stack is-sm">
-          <nav class="crumbs row" aria-label="Breadcrumb">
-            <a href="/">Overview</a>
-            <span>/</span>
-            <a href={`/services/${state.deploy.serviceSlug}`}>{state.deploy.serviceName}</a>
-            <span>/</span>
-            <span>#{state.deploy.number}</span>
-          </nav>
+          <Breadcrumb separatorText="/"
+                      items={[
+                        { label: "Overview", href: "/" },
+                        { label: state.deploy.serviceName, href: `/services/${state.deploy.serviceSlug}` },
+                        { label: `#${state.deploy.number}` },
+                      ]} />
 
           <div class="deploy-head row">
             <div class="stack is-sm">
@@ -149,10 +152,7 @@ function isLive(d: DeployRow): boolean {
                 <h1>
                   {state.deploy.kind === "rollback" ? "Rollback" : "Deploy"} #{state.deploy.number}
                 </h1>
-                <span class={["pill", statusClass(state.deploy.status)]}>
-                  <span class="pill-dot"></span>
-                  {statusLabel(state.deploy)}
-                </span>
+                <Badge variant={statusVariant(state.deploy.status)} dot>{statusLabel(state.deploy)}</Badge>
               </div>
               <div class="deploy-meta">
                 <span><strong>{state.deploy.serviceName}</strong> → <strong>{state.deploy.environment}</strong></span>
@@ -172,27 +172,24 @@ function isLive(d: DeployRow): boolean {
             </div>
 
             <div class="cluster">
-              <button e:if={state.deploy.status === "failed" && state.deploy.kind === "deploy"}
+              <Button e:if={state.deploy.status === "failed" && state.deploy.kind === "deploy"}
                       onclick={() => onRedeploy(state)}>
                 Retry deploy
-              </button>
-              <a e:if={state.deploy.environment === "production" && !isLive(state.deploy)}
-                 class="button"
-                 href={`/services/${state.deploy.serviceSlug}#rollback`}>
+              </Button>
+              <Button e:if={state.deploy.environment === "production" && !isLive(state.deploy)}
+                      href={`/services/${state.deploy.serviceSlug}#rollback`}>
                 Roll back production
-              </a>
+              </Button>
             </div>
           </div>
 
-          <p e:if={state.error} class="callout is-danger" role="alert">{state.error}</p>
+          <Alert e:if={state.error} variant="danger" description={state.error} />
 
-          <div e:if={state.deploy.status === "failed" && state.deploy.failedStage === "health check" && state.deploy.environment === "production"}
-               class="callout is-warning">
-            <div class="callout-title">Production is running a release that failed its health check</div>
-            <div class="callout-body">
-              {state.deploy.version} took traffic and then failed its checks. Roll back to the previous release or ship a fix.
-            </div>
-          </div>
+          <Alert e:if={state.deploy.status === "failed" && state.deploy.failedStage === "health check" && state.deploy.environment === "production"}
+                 variant="warning"
+                 role="none"
+                 title="Production is running a release that failed its health check"
+                 description={`${state.deploy.version} took traffic and then failed its checks. Roll back to the previous release or ship a fix.`} />
         </div>
 
         <section class="deploy-stages" aria-label="Stages">
@@ -203,7 +200,7 @@ function isLive(d: DeployRow): boolean {
                   onclick={() => onPickStage(state, stage.name)}>
             <span class="stage-card-top">
               <span class="stage-card-name">{stage.name}</span>
-              <span class={["pill", statusClass(stage.status)]}>{stage.status}</span>
+              <Badge variant={statusVariant(stage.status)}>{stage.status}</Badge>
             </span>
             <span class="stage-card-time">{stageSeconds(stage, state.now)}</span>
             <span class="stage-card-bar">
@@ -216,7 +213,7 @@ function isLive(d: DeployRow): boolean {
           <div class="log-head row">
             <h2>Log{state.stage ? ` · ${state.stage}` : ""}</h2>
             <div class="cluster is-sm">
-              <button e:if={state.stage} class="is-ghost is-sm" onclick={() => state.stage = ""}>Show all stages</button>
+              <Button e:if={state.stage} variant="link" size="sm" onclick={() => state.stage = ""}>Show all stages</Button>
               <span class="text-sm">{visibleLogs(state).length} lines</span>
             </div>
           </div>
