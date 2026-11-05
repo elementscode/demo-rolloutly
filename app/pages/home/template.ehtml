@@ -4,6 +4,10 @@ import favicon from "#app/shared/assets/favicons/favicon.svg";
 import { Layout } from "#app/shared/templates/layout";
 import { DeployItem } from "#app/shared/templates/deploy-item";
 import { HealthBadge } from "#app/shared/templates/health-badge";
+import { Card, CardAction, CardContent } from "@elements/ui/card";
+import { Progress } from "@elements/ui/progress";
+import { Empty } from "@elements/ui/empty";
+import { Button } from "@elements/ui/button";
 import { CurrentUser } from "#app/shared/services/auth";
 import { fetchOverview } from "#app/shared/services/deploys";
 import { applyHealth, DeployEvent, DeployRow, EnvState, HealthEvent, Overview, ServiceCard } from "#app/shared/services/models";
@@ -165,21 +169,20 @@ function unhealthy(services: ServiceCard[]): number {
 
                 <a e:if={s.running} class="service-running" href={`/deploys/${s.running!.number}`}>
                   <span>{s.running!.kind === "rollback" ? "Rolling back" : "Deploying"} {s.running!.version} to {s.running!.environment} · {s.running!.currentStage ?? "queued"}</span>
-                  <progress max={s.running!.stagesTotal} value={s.running!.stagesDone}></progress>
+                  <Progress max={s.running!.stagesTotal} value={s.running!.stagesDone} size="sm" attrs={{ "aria-label": `${s.name} deploy progress` }} />
                 </a>
               </article>
             </div>
           </section>
 
-          <aside class="overview-feed card">
-            <div class="card-head overview-section-head row">
-              <h2>Latest</h2>
-              <a href="/activity" class="text-sm">All activity</a>
-            </div>
-            <div class="card-body">
-              <DeployItem e:for={d of state.overview.recent} deploy={d} now={state.now} />
-              <p e:if={state.overview.recent.length === 0} class="overview-empty">No deploys yet.</p>
-            </div>
+          <aside class="overview-feed">
+            <Card title="Latest" level={2}>
+              <CardAction slot="action"><Button href="/activity" variant="link" size="sm">All activity</Button></CardAction>
+              <CardContent>
+                <DeployItem e:for={d of state.overview.recent} deploy={d} now={state.now} />
+                <Empty e:if={state.overview.recent.length === 0} title="No deploys yet" description="Deploys and rollbacks show here as they run." />
+              </CardContent>
+            </Card>
           </aside>
         </div>
       </div>

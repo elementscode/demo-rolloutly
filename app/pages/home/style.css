@@ -136,11 +136,6 @@
   text-decoration: none;
 }
 
-.service-running progress {
-  width: 100%;
-  height: 4px;
-}
-
 .running-list {
   gap: var(--space-2);
 }
@@ -213,12 +208,6 @@
 
 .overview-feed .card-body {
   padding-block: var(--space-1);
-}
-
-.overview-empty {
-  padding: var(--space-4);
-  font-size: var(--text-sm);
-  color: var(--ink-soft);
 }
 
 @media (max-width: 64rem) {
