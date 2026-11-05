@@ -6,6 +6,8 @@
 
 Deploy pipelines with streaming logs, production rollbacks, live service health, and charts of deploys per day, build time, success rate and time to recovery.
 
+Rolloutly uses the `coder` theme from @elements/ui.
+
 [Run this app on your machine](https://elements.dev/demos/01a0f39c-487d-75b7-9ff3-7b29c3d07711). Use this demo as inspiration, or as the starting point for your own app. Your agent creates a new app with this one as the scaffold, and you prompt it to add whatever features you want.
 
 ## How it's built
