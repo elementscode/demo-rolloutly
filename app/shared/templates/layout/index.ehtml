@@ -1,5 +1,7 @@
 import "./style.css";
 import { redirect } from "@elements/app";
+import { Button } from "@elements/ui/button";
+import { Badge } from "@elements/ui/badge";
 import { CurrentUser, signout } from "#app/shared/services/auth";
 
 interface NavItem {
@@ -47,12 +49,12 @@ function onSignout() {
         </nav>
 
         <div class="layout-user row">
-          <a href="/deploys/new" class="button is-primary is-sm">New deploy</a>
+          <Button href="/deploys/new" variant="primary" size="sm">New deploy</Button>
           <span class="layout-who">
             {user.name}
-            <span class="pill">{user.role}</span>
+            <Badge variant="secondary">{user.role}</Badge>
           </span>
-          <button class="is-ghost is-sm" onclick={() => onSignout()}>Sign out</button>
+          <Button variant="ghost" size="sm" onclick={() => onSignout()}>Sign out</Button>
         </div>
       </div>
     </header>

@@ -2,7 +2,7 @@
   white-space: nowrap;
 }
 
-.health-badge.is-success .pill-dot {
+.health-badge[data-variant="success"] .pill-dot {
   animation: health-pulse 2.4s ease-in-out infinite;
 }
 
@@ -17,7 +17,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .health-badge.is-success .pill-dot {
+  .health-badge[data-variant="success"] .pill-dot {
     animation: none;
   }
 }

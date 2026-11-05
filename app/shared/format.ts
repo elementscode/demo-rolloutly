@@ -80,39 +80,41 @@ export function dateTime(date: Date | null): string {
   return date.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
-export function healthClass(health: Health): string {
+export type StatusVariant = "success" | "warning" | "danger" | "info" | "secondary";
+
+export function healthVariant(health: Health): StatusVariant {
   switch (health) {
     case "healthy":
-      return "is-success";
+      return "success";
 
     case "degraded":
-      return "is-warning";
+      return "warning";
 
     case "down":
-      return "is-danger";
+      return "danger";
 
     default:
-      return "";
+      return "secondary";
   }
 }
 
-export function statusClass(status: DeployStatus | StageStatus): string {
+export function statusVariant(status: DeployStatus | StageStatus): StatusVariant {
   switch (status) {
     case "succeeded":
-      return "is-success";
+      return "success";
 
     case "failed":
-      return "is-danger";
+      return "danger";
 
     case "running":
-      return "is-info";
+      return "info";
 
     case "queued":
     case "pending":
-      return "is-warning";
+      return "warning";
 
     default:
-      return "";
+      return "secondary";
   }
 }
 
