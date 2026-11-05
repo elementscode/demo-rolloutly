@@ -3,6 +3,10 @@ import type { Listener } from "@elements/app";
 import favicon from "#app/shared/assets/favicons/favicon.svg";
 import { Layout } from "#app/shared/templates/layout";
 import { DeployItem } from "#app/shared/templates/deploy-item";
+import { Button } from "@elements/ui/button";
+import { Empty } from "@elements/ui/empty";
+import { NativeSelect } from "@elements/ui/native-select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@elements/ui/tabs";
 import { CurrentUser } from "#app/shared/services/auth";
 import { fetchActivity } from "#app/shared/services/deploys";
 import { DeployEvent, DeployRow, Service } from "#app/shared/services/models";
@@ -155,43 +159,39 @@ function days(state: ActivityState): Day[] {
           <p class="text-sm">Every deploy and rollback across all services, as it happens.</p>
         </div>
 
-        <div class="activity-filters row">
-          <div class="tabs">
-            <div class="tab-list" role="tablist">
-              <button e:for={f of FILTERS}
-                      role="tab"
-                      aria-selected={state.kind === f.id}
-                      class={["tab", state.kind === f.id && "is-active"]}
-                      onclick={() => state.kind = f.id}>
-                {f.label}
-              </button>
+        <Tabs value={state.kind} class="stack is-lg">
+          <div class="activity-filters row">
+            <TabsList label="Kind">
+              <TabsTrigger e:for={f of FILTERS} value={f.id}>{f.label}</TabsTrigger>
+            </TabsList>
+
+            <div class="activity-selects row">
+              <NativeSelect size="sm" value={state.serviceId} attrs={{ "aria-label": "Service" }}>
+                <option value="">All services</option>
+                <option e:for={s of services} value={s.id}>{s.name}</option>
+              </NativeSelect>
+              <NativeSelect size="sm" value={state.environment} attrs={{ "aria-label": "Environment" }}>
+                <option value="">Both environments</option>
+                <option value="staging">Staging</option>
+                <option value="production">Production</option>
+              </NativeSelect>
             </div>
           </div>
 
-          <div class="activity-selects row">
-            <select aria-label="Service" class="is-sm" value={state.serviceId}>
-              <option value="">All services</option>
-              <option e:for={s of services} value={s.id}>{s.name}</option>
-            </select>
-            <select aria-label="Environment" class="is-sm" value={state.environment}>
-              <option value="">Both environments</option>
-              <option value="staging">Staging</option>
-              <option value="production">Production</option>
-            </select>
-          </div>
-        </div>
+          <TabsContent e:for={f of FILTERS} value={f.id}>
+            <div e:if={state.kind === f.id} class="stack is-sm">
+              <section e:for={day of days(state)} class="activity-day">
+                <h2 class="activity-day-label">{day.label}</h2>
+                <DeployItem e:for={d of day.items} deploy={d} now={state.now} />
+              </section>
 
-        <div class="stack is-sm">
-          <section e:for={day of days(state)} class="activity-day">
-            <h2 class="activity-day-label">{day.label}</h2>
-            <DeployItem e:for={d of day.items} deploy={d} now={state.now} />
-          </section>
-
-          <p e:if={days(state).length === 0} class="activity-empty">Nothing matches these filters in the loaded history.</p>
-        </div>
+              <Empty e:if={days(state).length === 0} description="Nothing matches these filters in the loaded history." />
+            </div>
+          </TabsContent>
+        </Tabs>
 
         <div e:if={state.rows.length >= state.limit} class="activity-more row">
-          <button onclick={() => onMore(state)}>Load older</button>
+          <Button onclick={() => onMore(state)}>Load older</Button>
         </div>
       </div>
     </Layout>
