@@ -4,14 +4,6 @@
   max-width: 52rem;
 }
 
-.team-table td {
-  vertical-align: middle;
-}
-
-.team-table select {
-  width: auto;
-}
-
 .team-sub {
   font-size: var(--text-xs);
   color: var(--ink-soft);

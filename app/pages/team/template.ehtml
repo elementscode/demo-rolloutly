@@ -2,6 +2,14 @@ import "./style.css";
 import { sql, ValidationError } from "@elements/app";
 import favicon from "#app/shared/assets/favicons/favicon.svg";
 import { Layout } from "#app/shared/templates/layout";
+import { Alert } from "@elements/ui/alert";
+import { Badge } from "@elements/ui/badge";
+import { Button } from "@elements/ui/button";
+import { Card, CardContent } from "@elements/ui/card";
+import { Field } from "@elements/ui/field";
+import { Input } from "@elements/ui/input";
+import { NativeSelect } from "@elements/ui/native-select";
+import { Table, TableCell, TableHead } from "@elements/ui/table";
 import { CurrentUser, requireAdminOrThrow, Role } from "#app/shared/services/auth";
 import { timeAgo } from "#app/shared/format";
 
@@ -124,73 +132,68 @@ function onAdd(members: { list: Member[]; error: string }, form: MemberForm) {
           <p class="text-sm">Engineers deploy and roll back. Admins also manage accounts here.</p>
         </div>
 
-        <section class="card">
-          <div class="card-body">
-            <p e:if={members.error} class="callout is-danger" role="alert">{members.error}</p>
-            <table class="team-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th class="team-wide">Deploys</th>
-                  <th class="team-wide">Last deploy</th>
-                  <th>Role</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr e:for={m of members.list}>
-                  <td>
-                    <div>{m.name}</div>
-                    <div class="team-sub">{m.email}</div>
-                  </td>
-                  <td class="team-wide">{m.deploys}</td>
-                  <td class="team-wide">{timeAgo(m.lastDeployAt, now)}</td>
-                  <td>
-                    <span e:if={m.id === user.id} class="pill is-accent">{m.role} (you)</span>
-                    <select e:else
-                            class="is-sm"
-                            aria-label={`Role for ${m.name}`}
-                            value={m.role}
-                            onchange={(e) => onRole(members, m, (e.target as HTMLSelectElement).value as Role)}>
-                      <option value="engineer">engineer</option>
-                      <option value="admin">admin</option>
-                    </select>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <Card>
+          <CardContent class="stack">
+            <Alert e:if={members.error} variant="danger" description={members.error} />
+            <Table label="Accounts">
+              <table>
+                <thead>
+                  <tr>
+                    <TableHead>Name</TableHead>
+                    <TableHead class="team-wide" align="end">Deploys</TableHead>
+                    <TableHead class="team-wide">Last deploy</TableHead>
+                    <TableHead>Role</TableHead>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr e:for={m of members.list} e:key={(m) => m.id}>
+                    <TableCell>
+                      <div>{m.name}</div>
+                      <div class="team-sub">{m.email}</div>
+                    </TableCell>
+                    <TableCell class="team-wide" align="end">{m.deploys}</TableCell>
+                    <TableCell class="team-wide">{timeAgo(m.lastDeployAt, now)}</TableCell>
+                    <TableCell>
+                      <Badge e:if={m.id === user.id} variant="accent">{m.role} (you)</Badge>
+                      <NativeSelect e:else
+                                    size="sm"
+                                    value={m.role}
+                                    attrs={{ "aria-label": `Role for ${m.name}` }}
+                                    onchange={(e) => onRole(members, m, (e.target as HTMLSelectElement).value as Role)}>
+                        <option value="engineer">engineer</option>
+                        <option value="admin">admin</option>
+                      </NativeSelect>
+                    </TableCell>
+                  </tr>
+                </tbody>
+              </table>
+            </Table>
+          </CardContent>
+        </Card>
 
-        <section class="card">
-          <div class="card-head">
-            <h2 class="text-md">Add an account</h2>
-          </div>
+        <Card title="Add an account" level={2}>
           <form class="card-body team-form" onsubmit={() => onAdd(members, form)}>
-            <div class="field">
-              <label for="name">Name</label>
-              <input id="name" value={form.name} autocomplete="off" required>
-            </div>
-            <div class="field">
-              <label for="email">Email</label>
-              <input id="email" type="email" value={form.email} autocomplete="off" autocapitalize="none" spellcheck={false} required>
-            </div>
-            <div class="field">
-              <label for="password">Password</label>
-              <input id="password" type="password" value={form.password} autocomplete="new-password" minlength={8} required>
-            </div>
-            <div class="field">
-              <label for="role">Role</label>
-              <select id="role" value={form.role}>
+            <Field label="Name" required>
+              <Input value={form.name} attrs={{ autocomplete: "off" }} />
+            </Field>
+            <Field label="Email" required>
+              <Input type="email" value={form.email} attrs={{ autocomplete: "off", autocapitalize: "none", spellcheck: "false" }} />
+            </Field>
+            <Field label="Password" required>
+              <Input type="password" value={form.password} attrs={{ autocomplete: "new-password", minlength: 8 }} />
+            </Field>
+            <Field label="Role">
+              <NativeSelect value={form.role} block>
                 <option value="engineer">engineer</option>
                 <option value="admin">admin</option>
-              </select>
-            </div>
-            <p e:if={form.error} class="callout is-danger team-form-actions" role="alert">{form.error}</p>
+              </NativeSelect>
+            </Field>
+            <Alert e:if={form.error} variant="danger" description={form.error} class="team-form-actions" />
             <div class="team-form-actions row">
-              <button type="submit" class="is-primary">Add account</button>
+              <Button type="submit" variant="primary">Add account</Button>
             </div>
           </form>
-        </section>
+        </Card>
       </div>
     </Layout>
   </body>
