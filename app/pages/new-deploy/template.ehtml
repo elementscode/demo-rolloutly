@@ -2,6 +2,12 @@ import "./style.css";
 import { redirect } from "@elements/app";
 import favicon from "#app/shared/assets/favicons/favicon.svg";
 import { Layout } from "#app/shared/templates/layout";
+import { Alert } from "@elements/ui/alert";
+import { Badge } from "@elements/ui/badge";
+import { Button } from "@elements/ui/button";
+import { Field, FieldContent, FieldDescription, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "@elements/ui/field";
+import { NativeSelect } from "@elements/ui/native-select";
+import { RadioGroup, RadioGroupItem } from "@elements/ui/radio-group";
 import { CurrentUser } from "#app/shared/services/auth";
 import { DeployTargets, startDeploy } from "#app/shared/services/deploys";
 import { Commit, Env, ENVIRONMENTS, EnvState } from "#app/shared/services/models";
@@ -75,54 +81,57 @@ function onSubmit(form: DeployForm) {
           <p class="text-sm">Runs build, test, migrate, release and a health check.</p>
         </div>
 
-        <div class="field">
-          <label for="service">Service</label>
-          <select id="service" value={form.serviceId} onchange={() => onServiceChange(form, targets)}>
+        <Field label="Service" reserveError={false}>
+          <NativeSelect value={form.serviceId} block onchange={() => onServiceChange(form, targets)}>
             <option e:for={s of targets.services} value={s.id}>{s.name}</option>
-          </select>
-        </div>
+          </NativeSelect>
+        </Field>
 
-        <fieldset class="stack is-sm">
-          <legend>Environment</legend>
-          <div class="new-deploy-envs">
-            <label e:for={name of ENVIRONMENTS} class="choice">
-              <input type="radio" name="environment" group={form.environment} value={name}>
-              <span class="choice-body">
-                <span class="choice-title">{name}</span>
-                <span class="choice-sub">
-                  running <span class="mono">{envFor(targets, form.serviceId, name)?.currentVersion ?? "nothing"}</span>
-                </span>
-              </span>
-            </label>
-          </div>
-        </fieldset>
+        <FieldSet class="stack is-sm">
+          <FieldLegend>Environment</FieldLegend>
+          <RadioGroup value={form.environment} name="environment" class="new-deploy-envs">
+            <FieldLabel e:for={name of ENVIRONMENTS}>
+              <Field orientation="horizontal" reserveError={false}>
+                <RadioGroupItem value={name} />
+                <FieldContent>
+                  <FieldTitle class="choice-title">{name}</FieldTitle>
+                  <FieldDescription>
+                    running <span class="mono">{envFor(targets, form.serviceId, name)?.currentVersion ?? "nothing"}</span>
+                  </FieldDescription>
+                </FieldContent>
+              </Field>
+            </FieldLabel>
+          </RadioGroup>
+        </FieldSet>
 
-        <fieldset class="stack is-sm">
-          <legend>Commit</legend>
-          <div class="commit-list stack">
-            <label e:for={c of commitsFor(targets, form.serviceId)} class="choice">
-              <input type="radio" name="commit" group={form.commitId} value={c.id}>
-              <span class="choice-body">
-                <span class="commit-title">
-                  <span class="mono">{c.version}</span>
-                  <span class="commit-message">{c.message}</span>
-                  <span e:for={env of runningIn(targets, form.serviceId, c)} class="pill is-accent">in {env}</span>
-                </span>
-                <span class="choice-sub">
-                  <span class="mono">{shortSha(c.sha)}</span> · {c.author} · {timeAgo(c.committedAt, new Date())}
-                </span>
-              </span>
-            </label>
-          </div>
-        </fieldset>
+        <FieldSet class="stack is-sm">
+          <FieldLegend>Commit</FieldLegend>
+          <RadioGroup value={form.commitId} name="commit" class="commit-list stack">
+            <FieldLabel e:for={c of commitsFor(targets, form.serviceId)}>
+              <Field orientation="horizontal" reserveError={false}>
+                <RadioGroupItem value={c.id} />
+                <FieldContent>
+                  <FieldTitle class="commit-title">
+                    <span class="mono">{c.version}</span>
+                    <span class="commit-message">{c.message}</span>
+                    <Badge e:for={env of runningIn(targets, form.serviceId, c)} variant="accent">in {env}</Badge>
+                  </FieldTitle>
+                  <FieldDescription>
+                    <span class="mono">{shortSha(c.sha)}</span> · {c.author} · {timeAgo(c.committedAt, new Date())}
+                  </FieldDescription>
+                </FieldContent>
+              </Field>
+            </FieldLabel>
+          </RadioGroup>
+        </FieldSet>
 
-        <p e:if={form.error} class="callout is-danger" role="alert">{form.error}</p>
+        <Alert e:if={form.error} variant="danger" description={form.error} />
 
         <div class="new-deploy-actions row">
-          <a href="/" class="button is-ghost">Cancel</a>
-          <button type="submit" class={["is-primary", form.busy && "is-loading"]}>
+          <Button href="/" variant="ghost">Cancel</Button>
+          <Button type="submit" variant="primary" loading={form.busy}>
             Deploy to {form.environment}
-          </button>
+          </Button>
         </div>
       </form>
     </Layout>
