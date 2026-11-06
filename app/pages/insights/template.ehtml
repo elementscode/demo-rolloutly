@@ -22,18 +22,18 @@ interface InsightsState {
   dirty: boolean;
 }
 
-type DayRow = {
+interface DayRow {
   day: string;
   succeeded: number;
   failed: number;
   build: number | null;
   rate: number | null;
-};
+}
 
-type RecoveryRow = {
+interface RecoveryRow {
   deploy: string;
   recovered: number | null;
-};
+}
 
 const DEPLOYS: ChartConfig = {
   succeeded: { label: "succeeded", color: "var(--accent)" },
