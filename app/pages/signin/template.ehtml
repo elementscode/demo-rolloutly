@@ -7,6 +7,7 @@ import { Button } from "@elements/ui/button";
 import { Card } from "@elements/ui/card";
 import { Field } from "@elements/ui/field";
 import { Input } from "@elements/ui/input";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@elements/ui/item";
 
 interface SigninForm {
   email: string;
@@ -80,18 +81,17 @@ function onPick(form: SigninForm, login: DemoLogin) {
         </form>
 
         <Card title="Demo accounts" level={2}>
-          <div class="signin-logins stack">
-            <button e:for={login of logins}
-                    type="button"
-                    class="signin-login"
-                    onclick={() => onPick(form, login)}>
-              <span class="signin-login-top">
-                <span class="signin-login-name">{login.name}</span>
-                <Badge variant={login.role === "admin" ? "accent" : "secondary"}>{login.role}</Badge>
-              </span>
-              <span class="signin-login-cred">{login.email} / {login.password}</span>
-            </button>
-          </div>
+          <ItemGroup label="Demo accounts">
+            <Item e:for={login of logins} onclick={() => onPick(form, login)}>
+              <ItemContent>
+                <ItemTitle>
+                  {login.name}
+                  <Badge variant={login.role === "admin" ? "accent" : "secondary"}>{login.role}</Badge>
+                </ItemTitle>
+                <ItemDescription>{login.email} / {login.password}</ItemDescription>
+              </ItemContent>
+            </Item>
+          </ItemGroup>
         </Card>
       </div>
     </main>
